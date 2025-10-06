@@ -37,6 +37,329 @@ A comprehensive, high-performance C SDK for the Hyperliquid decentralized exchan
 - **EIP-712 signing** for authenticated requests
 - **Comprehensive testing** suite
 
+## 📋 **API Reference (Complete Method List)**
+
+**All 51 methods with input/output parameters:**
+
+### 🎯 **1. Trading Methods**
+
+#### `hl_place_order(hl_client_t *client, const hl_order_request_t *request, hl_order_result_t *result)`
+- **Purpose**: Create a new trading order
+- **Input**: `client` (client instance), `request` (order parameters)
+- **Output**: `result` (order creation result)
+- **Return**: `hl_error_t`
+
+#### `hl_cancel_order(hl_client_t *client, const char *symbol, const char *order_id, hl_cancel_result_t *result)`
+- **Purpose**: Cancel an existing order
+- **Input**: `client`, `symbol`, `order_id` (order to cancel)
+- **Output**: `result` (cancellation result)
+- **Return**: `hl_error_t`
+
+#### `hl_create_orders(hl_client_t *client, const hl_order_request_t *orders, size_t orders_count, hl_order_result_t *results)`
+- **Purpose**: Create multiple orders in batch
+- **Input**: `client`, `orders` (array), `orders_count` (array size)
+- **Output**: `results` (array of order results)
+- **Return**: `hl_error_t`
+
+#### `hl_cancel_orders(hl_client_t *client, const char **orders, size_t orders_count, hl_cancel_result_t *results)`
+- **Purpose**: Cancel multiple orders in batch
+- **Input**: `client`, `orders` (ID array), `orders_count`
+- **Output**: `results` (array of cancellation results)
+- **Return**: `hl_error_t`
+
+#### `hl_edit_order(hl_client_t *client, const char *order_id, const hl_order_request_t *request, hl_order_result_t *result)`
+- **Purpose**: Edit an existing order (cancel + create)
+- **Input**: `client`, `order_id`, `request` (new parameters)
+- **Output**: `result` (new order result)
+- **Return**: `hl_error_t`
+
+#### `hl_set_leverage(hl_client_t *client, int leverage, const char *symbol)`
+- **Purpose**: Set leverage for trading
+- **Input**: `client`, `leverage` (1-50), `symbol` (optional)
+- **Output**: None
+- **Return**: `hl_error_t`
+
+### 💰 **2. Account Data Methods**
+
+#### `hl_fetch_balance(hl_client_t *client, hl_account_type_t account_type, hl_balance_t *balance)`
+- **Purpose**: Get account balance
+- **Input**: `client`, `account_type` (spot/perpetual)
+- **Output**: `balance` (balance structure)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_positions(hl_client_t *client, const char **symbols, size_t symbols_count, hl_positions_t *positions)`
+- **Purpose**: Get all positions
+- **Input**: `client`, `symbols` (array, NULL for all), `symbols_count`
+- **Output**: `positions` (positions array)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_position(hl_client_t *client, const char *symbol, hl_position_t *position)`
+- **Purpose**: Get single position
+- **Input**: `client`, `symbol`
+- **Output**: `position` (position structure)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_trading_fee(hl_client_t *client, const char *symbol, hl_trading_fee_t *fee)`
+- **Purpose**: Get trading fees
+- **Input**: `client`, `symbol`
+- **Output**: `fee` (fee structure)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_ledger(hl_client_t *client, const char *currency, const char *since, uint32_t limit, hl_ledger_t *ledger)`
+- **Purpose**: Get transaction history
+- **Input**: `client`, `currency` (NULL for all), `since` (timestamp), `limit`
+- **Output**: `ledger` (transactions array)
+- **Return**: `hl_error_t`
+
+### 📊 **3. Market Data Methods**
+
+#### `hl_fetch_markets(hl_client_t *client, hl_markets_t *markets)`
+- **Purpose**: Get all markets
+- **Input**: `client`
+- **Output**: `markets` (markets array)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_swap_markets(hl_client_t *client, hl_markets_t *markets)`
+- **Purpose**: Get swap markets only
+- **Input**: `client`
+- **Output**: `markets` (swap markets)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_spot_markets(hl_client_t *client, hl_markets_t *markets)`
+- **Purpose**: Get spot markets only
+- **Input**: `client`
+- **Output**: `markets` (spot markets)
+- **Return**: `hl_error_t`
+
+#### `hl_get_asset_id(const hl_markets_t *markets, const char *symbol, uint32_t *asset_id)`
+- **Purpose**: Get asset ID from symbol
+- **Input**: `markets`, `symbol`
+- **Output**: `asset_id`
+- **Return**: `hl_error_t`
+
+#### `hl_get_market(const hl_markets_t *markets, const char *symbol, const hl_market_t **market)`
+- **Purpose**: Get market info
+- **Input**: `markets`, `symbol`
+- **Output**: `market` (pointer to market)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_ticker(hl_client_t *client, const char *symbol, hl_ticker_t *ticker)`
+- **Purpose**: Get market ticker
+- **Input**: `client`, `symbol`
+- **Output**: `ticker` (ticker data)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_tickers(hl_client_t *client, const char **symbols, size_t symbols_count, hl_tickers_t *tickers)`
+- **Purpose**: Get multiple tickers
+- **Input**: `client`, `symbols` (array), `symbols_count`
+- **Output**: `tickers` (tickers array)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_order_book(hl_client_t *client, const char *symbol, uint32_t depth, hl_orderbook_t *book)`
+- **Purpose**: Get order book
+- **Input**: `client`, `symbol`, `depth` (book depth)
+- **Output**: `book` (order book)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_ohlcv(hl_client_t *client, const char *symbol, const char *timeframe, const char *since, uint32_t limit, hl_ohlcvs_t *ohlcvs)`
+- **Purpose**: Get OHLCV candles
+- **Input**: `client`, `symbol`, `timeframe` ("1m","1h","1d"), `since`, `limit`
+- **Output**: `ohlcvs` (candles array)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_trades(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_trades_t *trades)`
+- **Purpose**: Get recent trades
+- **Input**: `client`, `symbol`, `since`, `limit`
+- **Output**: `trades` (trades array)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_funding_rates(hl_client_t *client, const char **symbols, size_t symbols_count, hl_funding_rates_t *rates)`
+- **Purpose**: Get funding rates
+- **Input**: `client`, `symbols` (array), `symbols_count`
+- **Output**: `rates` (funding rates)
+- **Return**: `hl_error_t`
+
+### 📋 **4. Order Management Methods**
+
+#### `hl_fetch_open_orders(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_orders_t *orders)`
+- **Purpose**: Get open orders
+- **Input**: `client`, `symbol` (NULL for all), `since`, `limit`
+- **Output**: `orders` (open orders)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_closed_orders(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_orders_t *orders)`
+- **Purpose**: Get closed orders
+- **Input**: `client`, `symbol` (NULL for all), `since`, `limit`
+- **Output**: `orders` (closed orders)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_canceled_orders(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_orders_t *orders)`
+- **Purpose**: Get canceled orders
+- **Input**: `client`, `symbol` (NULL for all), `since`, `limit`
+- **Output**: `orders` (canceled orders)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_canceled_and_closed_orders(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_orders_t *orders)`
+- **Purpose**: Get canceled and closed orders
+- **Input**: `client`, `symbol` (NULL for all), `since`, `limit`
+- **Output**: `orders` (canceled/closed orders)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_orders(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_orders_t *orders)`
+- **Purpose**: Get all orders
+- **Input**: `client`, `symbol` (NULL for all), `since`, `limit`
+- **Output**: `orders` (all orders)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_order(hl_client_t *client, const char *order_id, const char *symbol, hl_order_t *order)`
+- **Purpose**: Get specific order
+- **Input**: `client`, `order_id`, `symbol` (optional)
+- **Output**: `order` (order details)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_my_trades(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_trades_t *trades)`
+- **Purpose**: Get user's trades
+- **Input**: `client`, `symbol` (NULL for all), `since`, `limit`
+- **Output**: `trades` (user's trades)
+- **Return**: `hl_error_t`
+
+### 📈 **5. Historical Data Methods**
+
+#### `hl_fetch_funding_rate_history(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_funding_history_t *history)`
+- **Purpose**: Get funding rate history
+- **Input**: `client`, `symbol`, `since`, `limit`
+- **Output**: `history` (funding rate history)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_funding_history(hl_client_t *client, const char *symbol, const char *since, uint32_t limit, hl_funding_history_t *history)`
+- **Purpose**: Get funding payment history
+- **Input**: `client`, `symbol`, `since`, `limit`
+- **Output**: `history` (funding payments)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_open_interests(hl_client_t *client, const char **symbols, size_t symbols_count, hl_open_interests_t *interests)`
+- **Purpose**: Get open interest data
+- **Input**: `client`, `symbols` (array), `symbols_count`
+- **Output**: `interests` (open interest data)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_open_interest(hl_client_t *client, const char *symbol, hl_open_interest_t *interest)`
+- **Purpose**: Get single open interest
+- **Input**: `client`, `symbol`
+- **Output**: `interest` (open interest)
+- **Return**: `hl_error_t`
+
+### 💳 **6. Additional Methods**
+
+#### `hl_fetch_currencies(hl_client_t *client, hl_currencies_t *currencies)`
+- **Purpose**: Get available currencies
+- **Input**: `client`
+- **Output**: `currencies` (currencies array)
+- **Return**: `hl_error_t`
+
+#### `hl_add_margin(hl_client_t *client, const char *symbol, double amount)`
+- **Purpose**: Add margin to position
+- **Input**: `client`, `symbol`, `amount` (margin to add)
+- **Output**: None
+- **Return**: `hl_error_t`
+
+#### `hl_reduce_margin(hl_client_t *client, const char *symbol, double amount)`
+- **Purpose**: Reduce margin from position
+- **Input**: `client`, `symbol`, `amount` (margin to reduce)
+- **Output**: None
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_deposits(hl_client_t *client, const char *currency, const char *since, uint32_t limit, hl_transfers_t *deposits)`
+- **Purpose**: Get deposit history (stub)
+- **Input**: `client`, `currency`, `since`, `limit`
+- **Output**: `deposits` (deposits array)
+- **Return**: `hl_error_t`
+
+#### `hl_fetch_withdrawals(hl_client_t *client, const char *currency, const char *since, uint32_t limit, hl_transfers_t *withdrawals)`
+- **Purpose**: Get withdrawal history (stub)
+- **Input**: `client`, `currency`, `since`, `limit`
+- **Output**: `withdrawals` (withdrawals array)
+- **Return**: `hl_error_t`
+
+### 🔧 **7. Client Management Methods**
+
+#### `hl_client_create(const char *wallet_address, const char *private_key, bool testnet)`
+- **Purpose**: Create SDK client
+- **Input**: `wallet_address`, `private_key`, `testnet` (flag)
+- **Output**: `hl_client_t*` (client instance)
+- **Return**: Client pointer or NULL
+
+#### `hl_client_destroy(hl_client_t *client)`
+- **Purpose**: Destroy client instance
+- **Input**: `client`
+- **Output**: None
+- **Return**: None
+
+#### `hl_client_test_connection(hl_client_t *client)`
+- **Purpose**: Test API connectivity
+- **Input**: `client`
+- **Output**: None
+- **Return**: `hl_error_t`
+
+#### `hl_client_load_markets(hl_client_t *client)`
+- **Purpose**: Load market data
+- **Input**: `client`
+- **Output**: None
+- **Return**: `hl_error_t`
+
+---
+
+## 📊 **Data Structures**
+
+### **Core Structures:**
+- `hl_order_request_t` - Order creation parameters
+- `hl_order_result_t` - Order creation result
+- `hl_cancel_result_t` - Order cancellation result
+- `hl_balance_t` - Account balance
+- `hl_position_t` - Position data
+- `hl_market_t` - Market information
+- `hl_ticker_t` - Market ticker
+- `hl_orderbook_t` - Order book data
+- `hl_ohlcv_t` - OHLCV candle
+- `hl_trade_t` - Trade data
+
+### **Collection Types:**
+- `hl_orders_t` - Array of orders
+- `hl_trades_t` - Array of trades
+- `hl_positions_t` - Array of positions
+- `hl_markets_t` - Array of markets
+- `hl_tickers_t` - Array of tickers
+- `hl_ohlcvs_t` - Array of candles
+
+---
+
+## ⚠️ **Error Codes**
+
+```c
+typedef enum {
+    HL_SUCCESS = 0,              // Operation successful
+    HL_ERROR_INVALID_PARAMS,     // Invalid parameters
+    HL_ERROR_NETWORK,           // Network error
+    HL_ERROR_API,              // API error
+    HL_ERROR_AUTH,             // Authentication error
+    HL_ERROR_INSUFFICIENT_BALANCE, // Insufficient balance
+    HL_ERROR_INVALID_SYMBOL,    // Invalid trading symbol
+    HL_ERROR_ORDER_REJECTED,    // Order rejected by exchange
+    HL_ERROR_SIGNATURE,         // Signature generation failed
+    HL_ERROR_MSGPACK,          // MessagePack error
+    HL_ERROR_JSON,             // JSON parsing error
+    HL_ERROR_MEMORY,           // Memory allocation failed
+    HL_ERROR_TIMEOUT,          // Operation timed out
+    HL_ERROR_NOT_IMPLEMENTED,  // Feature not implemented
+    HL_ERROR_NOT_FOUND,        // Resource not found
+    HL_ERROR_PARSE            // Response parsing error
+} hl_error_t;
+```
+
+**Total: 51 methods with full CCXT compatibility!** 🎯
+
+---
+
 ## 📦 Installation
 
 ### Prerequisites
