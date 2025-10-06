@@ -18,6 +18,9 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(wildcard $(SRC_DIR)/msgpack/*.c) \
             $(SRC_DIR)/http/client.c \
             $(SRC_DIR)/client.c \
+            $(SRC_DIR)/client_new.c \
+            $(SRC_DIR)/exchange.c \
+            $(SRC_DIR)/types.c \
             $(SRC_DIR)/trading_api.c \
             $(SRC_DIR)/account.c \
             $(SRC_DIR)/markets.c \
@@ -35,6 +38,8 @@ TEST_HELPER_OBJS = $(patsubst $(TEST_DIR)/%.c,$(OBJ_DIR)/test/%.o,$(TEST_HELPER_
 UNIT_TESTS = test_crypto_msgpack
 INTEGRATION_TESTS = test_connection \
                     test_create_cancel_order \
+                    test_trading_comprehensive \
+                    test_ccxt_describe \
                     test_fetch_balance \
                     test_fetch_positions \
                     test_fetch_markets \
@@ -140,6 +145,24 @@ test_create_cancel_order: $(BIN_DIR)/test_create_cancel_order
 	@echo "Running test_create_cancel_order..."
 	@$(BIN_DIR)/test_create_cancel_order
 
+$(BIN_DIR)/test_trading_comprehensive: $(TEST_DIR)/integration/04_trading/test_trading_comprehensive.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+test_trading_comprehensive: $(BIN_DIR)/test_trading_comprehensive
+	@echo "Running test_trading_comprehensive..."
+	@$(BIN_DIR)/test_trading_comprehensive
+
+$(BIN_DIR)/test_ccxt_describe: $(TEST_DIR)/integration/05_ccxt_compatibility/test_ccxt_describe.c $(OBJ_DIR)/exchange.o $(OBJ_DIR)/types.o
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(OBJ_DIR)/exchange.o $(OBJ_DIR)/types.o -o $@ $(LDFLAGS) $(LIBS)
+
+test_ccxt_describe: $(BIN_DIR)/test_ccxt_describe
+	@echo "Running test_ccxt_describe..."
+	@$(BIN_DIR)/test_ccxt_describe
+
 # Account tests
 $(BIN_DIR)/test_fetch_balance: $(TEST_DIR)/integration/03_account/test_fetch_balance.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
 	@mkdir -p $(BIN_DIR)
@@ -216,7 +239,7 @@ test-account: test_fetch_balance test_fetch_positions
 	@echo ""
 	@echo "Account tests completed"
 
-test-trading: test_create_cancel_order test_fetch_order test_fetch_orders test_fetch_open_orders
+test-trading: test_create_cancel_order test_trading_comprehensive
 	@echo ""
 	@echo "Trading tests completed"
 

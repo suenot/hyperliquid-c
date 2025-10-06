@@ -12,7 +12,7 @@
 #include <cjson/cJSON.h>
 
 // Internal client accessor (from client.c)
-extern const char* hl_client_get_wallet_address(hl_client_t* client);
+extern const char* hl_client_get_wallet_address_old(hl_client_t* client);
 extern bool hl_client_is_testnet(hl_client_t* client);
 extern void* hl_client_get_http(hl_client_t* client);
 
@@ -29,7 +29,7 @@ static const char* get_base_url(hl_client_t* client) {
  * @brief Fetch perpetual account balance
  */
 static hl_error_t fetch_perpetual_balance(hl_client_t* client, hl_balance_t* balance) {
-    const char* wallet = hl_client_get_wallet_address(client);
+    const char* wallet = hl_client_get_wallet_address_old(client);
     if (!wallet) {
         return HL_ERROR_INVALID_PARAMS;
     }
@@ -148,7 +148,7 @@ static hl_error_t fetch_perpetual_balance(hl_client_t* client, hl_balance_t* bal
  * @brief Fetch spot account balance
  */
 static hl_error_t fetch_spot_balance(hl_client_t* client, hl_balance_t* balance) {
-    const char* wallet = hl_client_get_wallet_address(client);
+    const char* wallet = hl_client_get_wallet_address_old(client);
     if (!wallet) {
         return HL_ERROR_INVALID_PARAMS;
     }
@@ -405,7 +405,7 @@ hl_error_t hl_fetch_positions(hl_client_t* client, hl_position_t** positions, si
         return HL_ERROR_INVALID_PARAMS;
     }
 
-    const char* wallet = hl_client_get_wallet_address(client);
+    const char* wallet = hl_client_get_wallet_address_old(client);
     if (!wallet) {
         return HL_ERROR_INVALID_PARAMS;
     }

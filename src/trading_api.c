@@ -27,19 +27,27 @@ static uint64_t get_timestamp_ms(void) {
 }
 
 /**
- * @brief Get asset ID for a symbol (hardcoded for now - should use meta endpoint in production)
+ * @brief Get asset ID for a symbol (fetches from markets API)
  */
-static uint32_t get_asset_id(const char *symbol) {
-    // Hardcoded asset IDs for testnet (from /info meta endpoint)
-    // TODO: Cache and fetch dynamically from API
-    if (strcmp(symbol, "BTC") == 0) return 3;
-    if (strcmp(symbol, "ETH") == 0) return 2;
-    if (strcmp(symbol, "SOL") == 0) return 0;
-    if (strcmp(symbol, "APT") == 0) return 1;
-    if (strcmp(symbol, "ATOM") == 0) return 2;
-    
-    // Default to 0 (unknown)
-    return 0;
+static uint32_t get_asset_id(hl_client_t* client, const char *symbol) {
+    // Create full symbol (e.g., "BTC" -> "BTC/USDC:USDC")
+    char full_symbol[64];
+    snprintf(full_symbol, sizeof(full_symbol), "%s/USDC:USDC", symbol);
+
+    // Fetch markets if not already cached
+    hl_markets_t markets = {0};
+    hl_error_t err = hl_fetch_markets(client, &markets);
+    if (err != HL_SUCCESS) {
+        return 0; // fallback
+    }
+
+    uint32_t asset_id = 0;
+    err = hl_get_asset_id(&markets, full_symbol, &asset_id);
+
+    // Free markets
+    hl_markets_free(&markets);
+
+    return (err == HL_SUCCESS) ? asset_id : 0;
 }
 
 /**
@@ -81,11 +89,11 @@ hl_error_t hl_place_order(hl_client_t* client,
     result->order_id = NULL;
     
     // Extract client data using accessors
-    const char* wallet = hl_client_get_wallet_address(client);
-    const char* key = hl_client_get_private_key(client);
-    bool testnet = hl_client_is_testnet(client);
-    http_client_t* http = hl_client_get_http(client);
-    pthread_mutex_t* mutex = hl_client_get_mutex(client);
+    const char* wallet = hl_client_get_wallet_address_old(client);
+    const char* key = hl_client_get_private_key_old(client);
+    bool testnet = hl_client_is_testnet_old(client);
+    http_client_t* http = hl_client_get_http_old(client);
+    pthread_mutex_t* mutex = hl_client_get_mutex_old(client);
     
     if (!wallet || !key || !http || !mutex) {
         snprintf(result->error, sizeof(result->error), "Invalid client state");
@@ -96,8 +104,8 @@ hl_error_t hl_place_order(hl_client_t* client,
     pthread_mutex_lock(mutex);
     
     // Get asset ID
-    uint32_t asset_id = get_asset_id(request->symbol);
-    if (asset_id == 0) {
+    uint32_t asset_id = get_asset_id(client, request->symbol);
+    if (asset_id == 0 && strcmp(request->symbol, "SOL") != 0) {
         pthread_mutex_unlock(mutex);
         snprintf(result->error, sizeof(result->error), "Unknown symbol: %s", request->symbol);
         return HL_ERROR_INVALID_SYMBOL;
@@ -228,11 +236,11 @@ hl_error_t hl_cancel_order(hl_client_t* client,
     result->cancelled = false;
     
     // Extract client data using accessors
-    const char* wallet = hl_client_get_wallet_address(client);
-    const char* key = hl_client_get_private_key(client);
-    bool testnet = hl_client_is_testnet(client);
-    http_client_t* http = hl_client_get_http(client);
-    pthread_mutex_t* mutex = hl_client_get_mutex(client);
+    const char* wallet = hl_client_get_wallet_address_old(client);
+    const char* key = hl_client_get_private_key_old(client);
+    bool testnet = hl_client_is_testnet_old(client);
+    http_client_t* http = hl_client_get_http_old(client);
+    pthread_mutex_t* mutex = hl_client_get_mutex_old(client);
     
     if (!wallet || !key || !http || !mutex) {
         snprintf(result->error, sizeof(result->error), "Invalid client state");
@@ -243,8 +251,8 @@ hl_error_t hl_cancel_order(hl_client_t* client,
     pthread_mutex_lock(mutex);
     
     // Get asset ID
-    uint32_t asset_id = get_asset_id(symbol);
-    if (asset_id == 0) {
+    uint32_t asset_id = get_asset_id(client, symbol);
+    if (asset_id == 0 && strcmp(symbol, "SOL") != 0) {
         pthread_mutex_unlock(mutex);
         snprintf(result->error, sizeof(result->error), "Unknown symbol: %s", symbol);
         return HL_ERROR_INVALID_SYMBOL;

@@ -49,11 +49,11 @@ struct exchange_trader {
 };
 
 // Internal client accessors (used by trading/account/market modules)
-const char* hl_client_get_wallet_address(hl_client_t *client);
-const char* hl_client_get_private_key(hl_client_t *client);
-bool hl_client_is_testnet(hl_client_t *client);
-http_client_t* hl_client_get_http(hl_client_t *client);
-pthread_mutex_t* hl_client_get_mutex(hl_client_t *client);
+const char* hl_client_get_wallet_address_old(hl_client_t *client);
+const char* hl_client_get_private_key_old(hl_client_t *client);
+bool hl_client_is_testnet_old(hl_client_t *client);
+http_client_t* hl_client_get_http_old(hl_client_t *client);
+pthread_mutex_t* hl_client_get_mutex_old(hl_client_t *client);
 
 // Utility functions
 static inline void lv3_string_copy(char *dest, const char *src, size_t dest_size) {

@@ -38,6 +38,18 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 
+// Core CCXT-compatible includes
+#include "hl_exchange.h"
+#include "hl_types.h"
+#include "hl_client.h"
+
+// Legacy includes (for backward compatibility)
+#include "hl_account.h"
+#include "hl_markets.h"
+#include "hl_ticker.h"
+#include "hl_orderbook.h"
+#include "hl_ohlcv.h"
+
 // hl_account.h included at end of file after base types defined
 
 /***************************************************************************
