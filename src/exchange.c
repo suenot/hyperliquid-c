@@ -105,6 +105,9 @@ static const hl_capabilities_t HL_CAPABILITIES = {
     .fetch_trading_fee = true,
     .fetch_trading_fees = false,
 
+    // Currencies and funding
+    .fetch_funding_rates = true,
+
     // Funding
     .fetch_funding_rate = false,
     .fetch_funding_rates = true,
@@ -115,6 +118,9 @@ static const hl_capabilities_t HL_CAPABILITIES = {
     .fetch_deposits = true,
     .fetch_withdrawals = true,
     .fetch_ledger = true,
+
+    // Currencies
+    .fetch_currencies = true,
 
     // Advanced
     .set_leverage = true,
@@ -207,6 +213,10 @@ bool hl_exchange_has(const hl_exchange_config_t* config, const char* feature) {
     if (strcmp(feature, "fetch_orders") == 0) return has->fetch_orders;
     if (strcmp(feature, "fetch_trading_fee") == 0) return has->fetch_trading_fee;
     if (strcmp(feature, "fetch_trading_fees") == 0) return has->fetch_trading_fees;
+    if (strcmp(feature, "fetch_trades") == 0) return has->fetch_trades;
+    if (strcmp(feature, "fetch_tickers") == 0) return has->fetch_tickers;
+    if (strcmp(feature, "fetch_currencies") == 0) return has->fetch_currencies;
+    if (strcmp(feature, "set_leverage") == 0) return has->set_leverage;
 
     if (strcmp(feature, "fetch_funding_rate") == 0) return has->fetch_funding_rate;
     if (strcmp(feature, "fetch_funding_rates") == 0) return has->fetch_funding_rates;

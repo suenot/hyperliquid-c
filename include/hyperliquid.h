@@ -386,10 +386,165 @@ hl_error_t hl_get_orderbook(hl_client_t *client,
 
 /**
  * @brief Free order book
- * 
+ *
  * @param book Order book allocated by hl_get_orderbook
  */
 void hl_free_orderbook(hl_orderbook_t *book);
+
+/**
+ * @brief Free orders array
+ *
+ * @param orders Orders array allocated by fetch functions
+ */
+void hl_free_orders(hl_orders_t *orders);
+
+/**
+ * @brief Free trades array
+ *
+ * @param trades Trades array allocated by fetch functions
+ */
+void hl_free_trades(hl_trades_t *trades);
+
+/***************************************************************************
+ * ORDER MANAGEMENT
+ ***************************************************************************/
+
+/**
+ * @brief Fetch open orders
+ *
+ * @param client Client instance
+ * @param symbol Trading symbol (NULL for all symbols)
+ * @param since Timestamp to start from (NULL for all)
+ * @param limit Maximum number of orders (NULL for unlimited)
+ * @param orders Output orders array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_open_orders(hl_client_t* client,
+                               const char* symbol,
+                               const char* since,
+                               uint32_t limit,
+                               hl_orders_t* orders);
+
+/**
+ * @brief Fetch closed orders
+ *
+ * @param client Client instance
+ * @param symbol Trading symbol (NULL for all symbols)
+ * @param since Timestamp to start from (NULL for all)
+ * @param limit Maximum number of orders (NULL for unlimited)
+ * @param orders Output orders array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_closed_orders(hl_client_t* client,
+                                 const char* symbol,
+                                 const char* since,
+                                 uint32_t limit,
+                                 hl_orders_t* orders);
+
+/**
+ * @brief Fetch specific order by ID
+ *
+ * @param client Client instance
+ * @param order_id Order ID
+ * @param symbol Trading symbol
+ * @param order Output order structure
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_order(hl_client_t* client,
+                         const char* order_id,
+                         const char* symbol,
+                         hl_order_t* order);
+
+/***************************************************************************
+ * TRADE HISTORY
+ ***************************************************************************/
+
+/**
+ * @brief Fetch user trades
+ *
+ * @param client Client instance
+ * @param symbol Trading symbol (NULL for all symbols)
+ * @param since Timestamp to start from (NULL for all)
+ * @param limit Maximum number of trades (NULL for unlimited)
+ * @param trades Output trades array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_my_trades(hl_client_t* client,
+                             const char* symbol,
+                             const char* since,
+                             uint32_t limit,
+                             hl_trades_t* trades);
+
+/**
+ * @brief Fetch public trades
+ *
+ * @param client Client instance
+ * @param symbol Trading symbol
+ * @param since Timestamp to start from (NULL for all)
+ * @param limit Maximum number of trades (NULL for unlimited)
+ * @param trades Output trades array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_trades(hl_client_t* client,
+                          const char* symbol,
+                          const char* since,
+                          uint32_t limit,
+                          hl_trades_t* trades);
+
+/***************************************************************************
+ * MARKET DATA EXTENDED
+ ***************************************************************************/
+
+/**
+ * @brief Fetch multiple tickers
+ *
+ * @param client Client instance
+ * @param symbols Array of symbols (NULL for all)
+ * @param tickers Output tickers array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_tickers(hl_client_t* client,
+                           const char** symbols,
+                           size_t symbols_count,
+                           hl_tickers_t* tickers);
+
+/***************************************************************************
+ * LEVERAGE & MARGIN
+ ***************************************************************************/
+
+/**
+ * @brief Set leverage for symbol
+ *
+ * @param client Client instance
+ * @param leverage Leverage value (1-50)
+ * @param symbol Trading symbol (NULL for all)
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_set_leverage(hl_client_t* client,
+                          int leverage,
+                          const char* symbol);
+
+/***************************************************************************
+ * CURRENCY & FUNDING DATA
+ ***************************************************************************/
+
+/**
+ * @brief Fetch all available currencies
+ *
+ * @param client Client instance
+ * @param currencies Output currencies array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_currencies(hl_client_t* client, void* currencies);
+
+/**
+ * @brief Fetch funding rates for all symbols
+ *
+ * @param client Client instance
+ * @param rates Output funding rates array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_funding_rates(hl_client_t* client, void* rates);
 
 /***************************************************************************
  * UTILITY FUNCTIONS

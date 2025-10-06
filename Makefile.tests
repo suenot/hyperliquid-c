@@ -18,7 +18,6 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(wildcard $(SRC_DIR)/msgpack/*.c) \
             $(SRC_DIR)/http/client.c \
             $(SRC_DIR)/client.c \
-            $(SRC_DIR)/client_new.c \
             $(SRC_DIR)/exchange.c \
             $(SRC_DIR)/types.c \
             $(SRC_DIR)/trading_api.c \
@@ -26,7 +25,13 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(SRC_DIR)/markets.c \
             $(SRC_DIR)/ticker.c \
             $(SRC_DIR)/orderbook.c \
-            $(SRC_DIR)/ohlcv.c
+            $(SRC_DIR)/ohlcv.c \
+            $(SRC_DIR)/orders.c \
+            $(SRC_DIR)/trades.c \
+            $(SRC_DIR)/market_extended.c \
+            $(SRC_DIR)/leverage.c \
+            $(SRC_DIR)/currencies.c \
+            $(SRC_DIR)/funding.c
 
 TEST_HELPER_SRCS = $(TEST_DIR)/helpers/test_common.c
 
@@ -40,6 +45,8 @@ INTEGRATION_TESTS = test_connection \
                     test_create_cancel_order \
                     test_trading_comprehensive \
                     test_ccxt_describe \
+                    test_extended_api \
+                    test_advanced_api \
                     test_fetch_balance \
                     test_fetch_positions \
                     test_fetch_markets \
@@ -162,6 +169,24 @@ $(BIN_DIR)/test_ccxt_describe: $(TEST_DIR)/integration/05_ccxt_compatibility/tes
 test_ccxt_describe: $(BIN_DIR)/test_ccxt_describe
 	@echo "Running test_ccxt_describe..."
 	@$(BIN_DIR)/test_ccxt_describe
+
+$(BIN_DIR)/test_extended_api: $(TEST_DIR)/integration/06_extended_api/test_extended_api.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+test_extended_api: $(BIN_DIR)/test_extended_api
+	@echo "Running test_extended_api..."
+	@$(BIN_DIR)/test_extended_api
+
+$(BIN_DIR)/test_advanced_api: $(TEST_DIR)/integration/07_advanced_api/test_advanced_api.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+test_advanced_api: $(BIN_DIR)/test_advanced_api
+	@echo "Running test_advanced_api..."
+	@$(BIN_DIR)/test_advanced_api
 
 # Account tests
 $(BIN_DIR)/test_fetch_balance: $(TEST_DIR)/integration/03_account/test_fetch_balance.c $(CORE_OBJS) $(TEST_HELPER_OBJS)

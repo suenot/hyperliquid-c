@@ -38,6 +38,34 @@ void hl_trade_free(hl_trade_t* trade) {
     }
 }
 
+/**
+ * @brief Free orders array
+ */
+void hl_free_orders(hl_orders_t *orders) {
+    if (orders && orders->orders) {
+        for (size_t i = 0; i < orders->count; i++) {
+            hl_order_free(&orders->orders[i]);
+        }
+        free(orders->orders);
+        orders->orders = NULL;
+        orders->count = 0;
+    }
+}
+
+/**
+ * @brief Free trades array
+ */
+void hl_free_trades(hl_trades_t *trades) {
+    if (trades && trades->trades) {
+        for (size_t i = 0; i < trades->count; i++) {
+            hl_trade_free(&trades->trades[i]);
+        }
+        free(trades->trades);
+        trades->trades = NULL;
+        trades->count = 0;
+    }
+}
+
 // Utility functions for parsing timestamps
 void hl_timestamp_to_datetime(char* datetime, size_t size, const char* timestamp) {
     if (!datetime || size == 0) return;

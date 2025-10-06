@@ -78,6 +78,9 @@ struct hl_capabilities {
     bool fetch_withdrawals;
     bool fetch_ledger;
 
+    // Currencies
+    bool fetch_currencies;
+
     // Advanced
     bool set_leverage;
     bool add_margin;
