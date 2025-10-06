@@ -16,7 +16,7 @@ BIN_DIR = $(BUILD_DIR)/bin
 # Source files
 CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(wildcard $(SRC_DIR)/msgpack/*.c) \
-            $(wildcard $(SRC_DIR)/http/*.c) \
+            $(SRC_DIR)/http/client.c \
             $(SRC_DIR)/client.c \
             $(SRC_DIR)/trading_api.c \
             $(SRC_DIR)/account.c
@@ -196,6 +196,16 @@ test: test-unit test-integration
 	@echo "════════════════════════════════════════"
 	@echo "✅ ALL TESTS PASSED"
 	@echo "════════════════════════════════════════"
+
+# Example programs
+$(BIN_DIR)/example_balance: examples/simple_balance.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+example_balance: $(BIN_DIR)/example_balance
+	@echo "Running example_balance..."
+	@$(BIN_DIR)/example_balance
 
 # Clean
 clean:

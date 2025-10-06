@@ -13,7 +13,10 @@
 #include <stddef.h>
 
 // Forward declarations
-typedef struct http_client http_client_t;
+typedef struct http_client {
+    void* curl;                 /**< CURL handle (CURL* cast to void*) */
+    int timeout_ms;             /**< Request timeout in milliseconds */
+} http_client_t;
 
 // Error codes (compatibility with lv3_error_t)
 typedef enum {

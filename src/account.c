@@ -3,7 +3,6 @@
  * @brief Account & balance management implementation
  */
 
-#include "hl_account.h"
 #include "hyperliquid.h"
 #include "hl_http.h"
 #include <stdio.h>
@@ -33,86 +32,114 @@ static hl_error_t fetch_perpetual_balance(hl_client_t* client, hl_balance_t* bal
     if (!wallet) {
         return HL_ERROR_INVALID_PARAMS;
     }
-    
+
     http_client_t* http = (http_client_t*)hl_client_get_http(client);
     if (!http) {
         return HL_ERROR_INVALID_PARAMS;
     }
-    
+
     // Build request
     char body[512];
     snprintf(body, sizeof(body),
              "{\"type\":\"clearinghouseState\",\"user\":\"%s\"}",
              wallet);
-    
+
     const char* base_url = get_base_url(client);
     char url[256];
     snprintf(url, sizeof(url), "%s/info", base_url);
-    
+
     // Make request
     http_response_t response = {0};
     lv3_error_t err = http_client_post(http, url, body, "Content-Type: application/json", &response);
-    
+
     if (err != LV3_SUCCESS) {
         http_response_free(&response);
         return HL_ERROR_NETWORK;
     }
-    
+
     if (response.status_code != 200) {
         http_response_free(&response);
         return HL_ERROR_API;
     }
-    
+
     // Parse response
     cJSON* json = cJSON_Parse(response.body);
     http_response_free(&response);
-    
+
     if (!json) {
         return HL_ERROR_PARSE;
     }
-    
+
     // Extract margin summary
     cJSON* margin_summary = cJSON_GetObjectItem(json, "marginSummary");
     if (margin_summary) {
-        balance->account_value = cJSON_GetObjectItem(margin_summary, "accountValue")->valuedouble;
-        balance->total_margin_used = cJSON_GetObjectItem(margin_summary, "totalMarginUsed")->valuedouble;
-        balance->total_ntl_pos = cJSON_GetObjectItem(margin_summary, "totalNtlPos")->valuedouble;
-        balance->total_raw_usd = cJSON_GetObjectItem(margin_summary, "totalRawUsd")->valuedouble;
+        cJSON* account_value = cJSON_GetObjectItem(margin_summary, "accountValue");
+        if (account_value) {
+            balance->account_value = cJSON_IsString(account_value) ?
+                atof(account_value->valuestring) : account_value->valuedouble;
+        }
+
+        cJSON* total_margin = cJSON_GetObjectItem(margin_summary, "totalMarginUsed");
+        if (total_margin) {
+            balance->total_margin_used = cJSON_IsString(total_margin) ?
+                atof(total_margin->valuestring) : total_margin->valuedouble;
+        }
+
+        cJSON* total_ntl = cJSON_GetObjectItem(margin_summary, "totalNtlPos");
+        if (total_ntl) {
+            balance->total_ntl_pos = cJSON_IsString(total_ntl) ?
+                atof(total_ntl->valuestring) : total_ntl->valuedouble;
+        }
+
+        cJSON* total_raw = cJSON_GetObjectItem(margin_summary, "totalRawUsd");
+        if (total_raw) {
+            balance->total_raw_usd = cJSON_IsString(total_raw) ?
+                atof(total_raw->valuestring) : total_raw->valuedouble;
+        }
     }
-    
+
     // Extract cross margin summary
     cJSON* cross_summary = cJSON_GetObjectItem(json, "crossMarginSummary");
     if (cross_summary) {
-        balance->cross_account_value = cJSON_GetObjectItem(cross_summary, "accountValue")->valuedouble;
-        balance->cross_margin_used = cJSON_GetObjectItem(cross_summary, "totalMarginUsed")->valuedouble;
+        cJSON* cross_value = cJSON_GetObjectItem(cross_summary, "accountValue");
+        if (cross_value) {
+            balance->cross_account_value = cJSON_IsString(cross_value) ?
+                atof(cross_value->valuestring) : cross_value->valuedouble;
+        }
+
+        cJSON* cross_margin = cJSON_GetObjectItem(cross_summary, "totalMarginUsed");
+        if (cross_margin) {
+            balance->cross_margin_used = cJSON_IsString(cross_margin) ?
+                atof(cross_margin->valuestring) : cross_margin->valuedouble;
+        }
     }
-    
+
     // Extract withdrawable
     cJSON* withdrawable = cJSON_GetObjectItem(json, "withdrawable");
     if (withdrawable) {
         balance->withdrawable = cJSON_IsString(withdrawable) ?
             atof(withdrawable->valuestring) : withdrawable->valuedouble;
     }
-    
+
     // Extract cross maintenance margin
     cJSON* cross_maint = cJSON_GetObjectItem(json, "crossMaintenanceMarginUsed");
     if (cross_maint) {
         balance->cross_maintenance_margin_used = cJSON_IsString(cross_maint) ?
             atof(cross_maint->valuestring) : cross_maint->valuedouble;
     }
-    
+
     // Extract timestamp
     cJSON* time = cJSON_GetObjectItem(json, "time");
-    if (time) {
+    if (time && time->valuestring) {
         balance->timestamp = (uint64_t)atoll(time->valuestring);
     }
-    
+
     balance->type = HL_ACCOUNT_PERPETUAL;
     balance->spot_balances = NULL;
     balance->spot_balance_count = 0;
-    
+
     cJSON_Delete(json);
-    
+
     return HL_SUCCESS;
 }
 
@@ -223,9 +250,9 @@ hl_error_t hl_fetch_balance(hl_client_t* client, hl_account_type_t type, hl_bala
     if (!client || !balance) {
         return HL_ERROR_INVALID_PARAMS;
     }
-    
+
     memset(balance, 0, sizeof(hl_balance_t));
-    
+
     if (type == HL_ACCOUNT_PERPETUAL) {
         return fetch_perpetual_balance(client, balance);
     } else {

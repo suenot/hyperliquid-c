@@ -19,10 +19,7 @@ extern "C" {
 // Forward declarations (types defined in hyperliquid.h)
 // Note: This header must be included AFTER hl_error_t is defined
 typedef struct hl_client hl_client_t;
-// hl_error_t forward declaration (actual definition in hyperliquid.h)
-#ifndef HL_ERROR_T_DEFINED
-typedef int hl_error_t;  // Placeholder
-#endif
+// hl_error_t is defined in hyperliquid.h - no forward declaration needed
 
 /**
  * @brief Account types

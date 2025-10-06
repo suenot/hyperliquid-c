@@ -32,34 +32,40 @@ extern lv3_error_t hyperliquid_trader_create(const char *wallet_address,
                                               void **trader_out);
 extern void hyperliquid_trader_destroy(void *trader);
 
-hl_client_t* hl_client_create(const char *wallet_address, 
+hl_client_t* hl_client_create(const char *wallet_address,
                                const char *private_key,
                                bool testnet) {
     if (!wallet_address || !private_key) {
         return NULL;
     }
-    
+
     // Validate wallet address format
-    if (strlen(wallet_address) < 42 || 
-        wallet_address[0] != '0' || 
+    if (strlen(wallet_address) < 42 ||
+        wallet_address[0] != '0' ||
         wallet_address[1] != 'x') {
         return NULL;
     }
-    
-    // Validate private key length
-    if (strlen(private_key) != 64) {
+
+    // Validate private key length (allow both 64 and 66 chars for 0x prefix)
+    size_t key_len = strlen(private_key);
+    if (key_len != 64 && key_len != 66) {
         return NULL;
     }
-    
+
     // Allocate client
     hl_client_t *client = (hl_client_t*)calloc(1, sizeof(hl_client_t));
     if (!client) {
         return NULL;
     }
-    
-    // Copy credentials
-    strncpy(client->wallet_address, wallet_address, sizeof(client->wallet_address) - 1);
-    strncpy(client->private_key, private_key, sizeof(client->private_key) - 1);
+
+    // Copy credentials (strip 0x prefix if present)
+    const char* wallet_copy = (strlen(wallet_address) >= 2 && wallet_address[0] == '0' && wallet_address[1] == 'x')
+                            ? wallet_address + 2 : wallet_address;
+    const char* key_copy = (strlen(private_key) >= 2 && private_key[0] == '0' && private_key[1] == 'x')
+                         ? private_key + 2 : private_key;
+
+    strncpy(client->wallet_address, wallet_copy, sizeof(client->wallet_address) - 1);
+    strncpy(client->private_key, key_copy, sizeof(client->private_key) - 1);
     client->testnet = testnet;
     client->timeout_ms = 30000; // 30 seconds default
     client->debug = false;
