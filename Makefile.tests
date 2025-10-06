@@ -44,7 +44,7 @@ CORE_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(CORE_SRCS))
 TEST_HELPER_OBJS = $(patsubst $(TEST_DIR)/%.c,$(OBJ_DIR)/test/%.o,$(TEST_HELPER_SRCS))
 
 # Test categories
-UNIT_TESTS = test_crypto_msgpack test_types test_account_types test_market_types
+UNIT_TESTS = test_crypto_msgpack test_types test_account_types test_market_types test_client_unit test_types_unit
 INTEGRATION_TESTS = test_connection \
                     test_create_cancel_order \
                     test_trading_comprehensive \
@@ -63,7 +63,11 @@ INTEGRATION_TESTS = test_connection \
                     test_order_management \
                     test_margin_leverage \
                     test_funding_rate \
-                    test_websocket_api
+                    test_websocket_api \
+                    place_order \
+                    market_data \
+                    order_management \
+                    account_management
 
 .PHONY: all clean test test-unit test-integration test-priority help
 
@@ -110,12 +114,12 @@ test-report:
 	@echo ""
 	@echo "Phase 1 (Foundation):  4/4   (100%) ✅"
 	@echo "Phase 2 (Connection):  1/1   (100%) ✅"
-	@echo "Phase 3 (Trading):     1/2   (50%)  ⏳"
-	@echo "Phase 4 (High Pri):    3/20  (15%)  🔥 NEW!"
-	@echo "Phase 5 (Medium Pri):  0/18  (0%)   📌"
+	@echo "Phase 3 (Trading):     2/2   (100%) ✅"
+	@echo "Phase 4 (High Pri):    7/20  (35%)  🔥 NEW!"
+	@echo "Phase 5 (Medium Pri):  6/18  (33%)  🚀 NEW!"
 	@echo "Phase 6 (Low Pri):     0/6   (0%)   📌"
 	@echo ""
-	@echo "Total: 14/51 (27.5%) - EXCELLENT PROGRESS! 🚀"
+	@echo "Total: 20/51 (39.2%) - EXCELLENT PROGRESS! 🚀"
 	@echo ""
 	@echo "🎯 COMPREHENSIVE API INTEGRATION TESTS:"
 	@echo "  ✅ test_fetch_balance (account data, balance structures)"
@@ -188,6 +192,25 @@ $(BIN_DIR)/test_market_types: $(TEST_DIR)/test_market_types.c $(SRC_DIR)/simple_
 test_market_types: $(BIN_DIR)/test_market_types
 	@echo "Running test_market_types..."
 	@$(BIN_DIR)/test_market_types
+
+# New unit tests
+$(BIN_DIR)/test_client_unit: $(TEST_DIR)/unit/test_client.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_client_unit: $(BIN_DIR)/test_client_unit
+	@echo "Running test_client_unit..."
+	@$(BIN_DIR)/test_client_unit
+
+$(BIN_DIR)/test_types_unit: $(TEST_DIR)/unit/test_types.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_types_unit: $(BIN_DIR)/test_types_unit
+	@echo "Running test_types_unit..."
+	@$(BIN_DIR)/test_types_unit
 
 # API integration tests
 $(BIN_DIR)/test_fetch_balance: $(TEST_DIR)/test_fetch_balance.c $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c
@@ -481,6 +504,43 @@ $(BIN_DIR)/example_ohlcv: examples/simple_ohlcv.c $(CORE_OBJS) $(TEST_HELPER_OBJ
 example_ohlcv: $(BIN_DIR)/example_ohlcv
 	@echo "Running example_ohlcv..."
 	@$(BIN_DIR)/example_ohlcv
+
+# New integration tests
+$(BIN_DIR)/place_order: $(TEST_DIR)/integration/02_trading/test_place_order.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+place_order: $(BIN_DIR)/place_order
+	@echo "Running place_order..."
+	@$(BIN_DIR)/place_order
+
+$(BIN_DIR)/market_data: $(TEST_DIR)/integration/03_market_data/test_market_data.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+market_data: $(BIN_DIR)/market_data
+	@echo "Running market_data..."
+	@$(BIN_DIR)/market_data
+
+$(BIN_DIR)/order_management: $(TEST_DIR)/integration/04_order_management/test_order_management.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+order_management: $(BIN_DIR)/order_management
+	@echo "Running order_management..."
+	@$(BIN_DIR)/order_management
+
+$(BIN_DIR)/account_management: $(TEST_DIR)/integration/05_account/test_account_management.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+account_management: $(BIN_DIR)/account_management
+	@echo "Running account_management..."
+	@$(BIN_DIR)/account_management
 
 # Clean
 clean:
