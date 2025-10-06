@@ -749,6 +749,61 @@ hl_error_t hl_fetch_swap_markets(hl_client_t* client, hl_markets_t* markets) {
 }
 
 /**
+ * @brief Fetch spot markets only
+ */
+hl_error_t hl_fetch_spot_markets(hl_client_t* client, hl_markets_t* markets) {
+    if (!client || !markets) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(markets, 0, sizeof(hl_markets_t));
+
+    // Get all markets first
+    hl_markets_t all_markets = {0};
+    hl_error_t err = hl_fetch_markets(client, &all_markets);
+    if (err != HL_SUCCESS) {
+        return err;
+    }
+
+    // Count spot markets (Hyperliquid primarily focuses on perpetuals, so this may be empty)
+    size_t spot_count = 0;
+    for (size_t i = 0; i < all_markets.count; i++) {
+        if (strcmp(all_markets.markets[i].type, "spot") == 0) {
+            spot_count++;
+        }
+    }
+
+    if (spot_count == 0) {
+        hl_markets_free(&all_markets);
+        return HL_SUCCESS; // No spot markets (expected for Hyperliquid)
+    }
+
+    // Allocate spot markets array
+    markets->markets = calloc(spot_count, sizeof(hl_market_t));
+    if (!markets->markets) {
+        hl_markets_free(&all_markets);
+        return HL_ERROR_MEMORY;
+    }
+
+    // Copy spot markets
+    size_t spot_idx = 0;
+    for (size_t i = 0; i < all_markets.count; i++) {
+        if (strcmp(all_markets.markets[i].type, "spot") == 0) {
+            markets->markets[spot_idx] = all_markets.markets[i];
+            spot_idx++;
+        }
+    }
+
+    markets->count = spot_count;
+
+    // Free original array (but not individual markets since we copied them)
+    free(all_markets.markets);
+
+    return HL_SUCCESS;
+}
+
+/**
  * @brief Free open interests array
  */
 void hl_free_open_interests(hl_open_interests_t* interests) {

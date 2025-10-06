@@ -1,7 +1,7 @@
 # Hyperliquid C SDK
 
 [![CCXT Compatible](https://img.shields.io/badge/CCXT-Compatible-brightgreen.svg)](https://github.com/ccxt/ccxt)
-[![Methods: 43/51](https://img.shields.io/badge/Methods-43%2F51%2084.3%25-blue.svg)]()
+[![Methods: 44/51](https://img.shields.io/badge/Methods-44%2F51%2086.3%25-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![C Standard](https://img.shields.io/badge/C-99-blue.svg)](https://en.wikipedia.org/wiki/C99)
 
@@ -9,12 +9,12 @@ A comprehensive, high-performance C SDK for the Hyperliquid decentralized exchan
 
 ## 🚀 Features
 
-### ✅ **Complete REST API (43/51 methods - 84.3%)**
+### ✅ **Complete REST API (44/51 methods - 86.3%)**
 - **Trading**: `create_order()`, `cancel_order()` - Full order lifecycle
 - **Market Data**: `fetch_ticker()`, `fetch_order_book()`, `fetch_ohlcv()`, `fetch_trades()`
 - **Account**: `fetch_balance()`, `fetch_positions()`, `fetch_my_trades()`, `fetch_ledger()`
 - **Order Management**: All order states (open/closed/canceled/combined)
-- **Advanced**: `fetch_markets()`, `fetch_swap_markets()`, `fetch_currencies()`
+- **Advanced**: `fetch_markets()`, `fetch_swap_markets()`, `fetch_spot_markets()`, `fetch_currencies()`
 - **Analytics**: `fetch_funding_rates()`, `fetch_funding_history()`, `fetch_open_interests()`
 
 ### ✅ **WebSocket Framework (Production Ready)**
