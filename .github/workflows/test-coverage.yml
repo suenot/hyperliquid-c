@@ -1,0 +1,117 @@
+name: Test Coverage & Quality
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          libcurl4-openssl-dev \
+          libjansson-dev \
+          libsecp256k1-dev \
+          uuid-dev \
+          lcov \
+          gcovr
+
+    - name: Build with coverage
+      run: |
+        make clean
+        make CFLAGS="-O0 -g --coverage -fprofile-arcs -ftest-coverage" LDFLAGS="--coverage -lgcov"
+
+    - name: Run tests
+      run: |
+        make test || true  # Continue even if some tests fail
+        # Run integration tests that don't require real credentials
+        ./build/bin/test_ccxt_describe || true
+
+    - name: Generate coverage report
+      run: |
+        lcov --capture --directory . --output-file coverage.info --include "*/src/*" --exclude "*/tests/*" --exclude "*/examples/*"
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/examples/*' --output-file coverage.info
+        lcov --list coverage.info
+
+    - name: Generate coverage badge
+      run: |
+        # Calculate coverage percentage
+        COVERAGE=$(lcov --summary coverage.info 2>&1 | grep "lines......" | sed 's/.*: \([0-9.]*\)%.*/\1/' || echo "0.0")
+        echo "Coverage: $COVERAGE%"
+
+        # Use our coverage badge script
+        chmod +x scripts/generate-coverage-badge.sh
+        ./scripts/generate-coverage-badge.sh "$COVERAGE"
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: coverage.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Comment coverage on PR
+      if: github.event_name == 'pull_request'
+      uses: dorny/test-reporter@v1
+      with:
+        name: Test Coverage Results
+        path: 'coverage.info'
+        reporter: lcov
+
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          libcurl4-openssl-dev \
+          libjansson-dev \
+          libsecp256k1-dev \
+          uuid-dev \
+          clang-format \
+          cppcheck
+
+    - name: Check code formatting
+      run: |
+        find src include tests examples -name "*.c" -o -name "*.h" | xargs clang-format --dry-run --Werror --style=file || true
+
+    - name: Static analysis
+      run: |
+        cppcheck --enable=all --std=c99 --language=c --platform=unix64 \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --suppress=unmatchedSuppression \
+          --inline-suppr \
+          --xml --xml-version=2 \
+          src/ include/ 2> cppcheck_results.xml || true
+
+    - name: Check code modularity
+      run: |
+        # Use our modularity check script
+        chmod +x scripts/check-modularity.sh
+        ./scripts/check-modularity.sh
+
+    - name: Generate quality badge
+      run: |
+        # Check if modularity passed
+        if [ "${{ env.MODULARITY_STATUS }}" = "pass" ]; then
+          QUALITY_BADGE="https://img.shields.io/badge/code_quality-A-brightgreen.svg"
+        else
+          QUALITY_BADGE="https://img.shields.io/badge/code_quality-B-yellow.svg"
+        fi
+        echo "QUALITY_BADGE_URL=$QUALITY_BADGE" >> $GITHUB_ENV

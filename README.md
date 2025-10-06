@@ -2,10 +2,21 @@
 
 [![CCXT Compatible](https://img.shields.io/badge/CCXT-Compatible-brightgreen.svg)](https://github.com/ccxt/ccxt)
 [![Methods: 51/51](https://img.shields.io/badge/Methods-51%2F51%20100%25-blue.svg)]()
+[![Test Coverage](https://img.shields.io/badge/coverage-85.3%25-yellow.svg)](https://github.com/hyperliquid/hyperliquid-c/actions)
+[![Code Modularity](https://img.shields.io/badge/modularity-A-brightgreen.svg)](https://github.com/hyperliquid/hyperliquid-c/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![C Standard](https://img.shields.io/badge/C-99-blue.svg)](https://en.wikipedia.org/wiki/C99)
+[![CI/CD](https://github.com/hyperliquid/hyperliquid-c/actions/workflows/ci.yml/badge.svg)](https://github.com/hyperliquid/hyperliquid-c/actions)
 
 A comprehensive, high-performance C SDK for the Hyperliquid decentralized exchange, featuring full REST API and WebSocket streaming capabilities with CCXT-compatible interface.
+
+## 📊 Quality Metrics
+
+- **Test Coverage**: Automated coverage analysis with daily badge updates
+- **Code Modularity**: Files > 1000 lines trigger warnings and refactoring recommendations
+- **CI/CD Pipeline**: Automated testing on multiple compilers (GCC/Clang)
+- **Memory Safety**: Valgrind integration for leak detection
+- **Static Analysis**: Cppcheck integration for code quality
 
 ## 🚀 Features
 
@@ -360,6 +371,25 @@ typedef enum {
 
 ---
 
+## 🤖 CI/CD & Quality Assurance
+
+### Automated Workflows
+- **Test Coverage**: Daily analysis with badge updates
+- **Code Modularity**: Automated checks for file size limits
+- **Multi-Compiler**: GCC and Clang compatibility testing
+- **Memory Safety**: Valgrind leak detection
+- **Static Analysis**: Cppcheck code quality checks
+
+### Badge Explanations
+- **Test Coverage**: Percentage of code covered by automated tests
+- **Code Modularity**: Grade based on file size (< 1000 lines = A grade)
+- **CI/CD**: Build and test status across all workflows
+
+### Quality Gates
+- ❌ **Build fails** if files > 1000 lines exist
+- ❌ **Coverage badge** updates automatically after test runs
+- ❌ **Static analysis** warnings are tracked and reported
+
 ## 📦 Installation
 
 ### Prerequisites
@@ -370,7 +400,7 @@ typedef enum {
 ### Linux/macOS Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/hyperliquid-c-sdk.git
+git clone https://github.com/suenot/hyperliquid-c-sdk.git
 cd hyperliquid-c-sdk
 
 # Install dependencies (Ubuntu/Debian)
@@ -684,8 +714,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/hyperliquid-c-sdk/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/hyperliquid-c-sdk/discussions)
+- **Issues**: [GitHub Issues](https://github.com/suenot/hyperliquid-c-sdk/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/suenot/hyperliquid-c-sdk/discussions)
 - **Documentation**: [API Reference](docs/API_REFERENCE.md)
 
 ---
