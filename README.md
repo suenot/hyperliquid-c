@@ -9,7 +9,7 @@ A comprehensive, high-performance C SDK for the Hyperliquid decentralized exchan
 
 ## 🚀 Features
 
-### ✅ **Complete REST API (44/51 methods - 86.3%)**
+### ✅ **Complete REST API (51/51 methods - 100%)**
 - **Trading**: `create_order()`, `cancel_order()` - Full order lifecycle
 - **Market Data**: `fetch_ticker()`, `fetch_order_book()`, `fetch_ohlcv()`, `fetch_trades()`
 - **Account**: `fetch_balance()`, `fetch_positions()`, `fetch_my_trades()`, `fetch_ledger()`
