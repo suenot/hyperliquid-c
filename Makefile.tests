@@ -32,6 +32,7 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(SRC_DIR)/leverage.c \
             $(SRC_DIR)/currencies.c \
             $(SRC_DIR)/funding.c \
+            $(SRC_DIR)/transfers.c \
             $(SRC_DIR)/ws_client.c \
             $(SRC_DIR)/websocket.c
 

@@ -1,7 +1,7 @@
 # Hyperliquid C SDK
 
 [![CCXT Compatible](https://img.shields.io/badge/CCXT-Compatible-brightgreen.svg)](https://github.com/ccxt/ccxt)
-[![Methods: 44/51](https://img.shields.io/badge/Methods-44%2F51%2086.3%25-blue.svg)]()
+[![Methods: 47/51](https://img.shields.io/badge/Methods-47%2F51%2092.2%25-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![C Standard](https://img.shields.io/badge/C-99-blue.svg)](https://en.wikipedia.org/wiki/C99)
 

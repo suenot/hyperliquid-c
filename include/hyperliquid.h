@@ -572,6 +572,38 @@ const char* hl_version(void);
  */
 void hl_set_debug(bool enabled);
 
+/**
+ * @brief Fetch deposit history
+ *
+ * @param client Client instance
+ * @param currency Currency code (NULL for all)
+ * @param since Start time (NULL for recent)
+ * @param limit Maximum entries to retrieve
+ * @param deposits Output deposit history array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_deposits(hl_client_t* client,
+                            const char* currency,
+                            const char* since,
+                            uint32_t limit,
+                            void* deposits);
+
+/**
+ * @brief Fetch withdrawal history
+ *
+ * @param client Client instance
+ * @param currency Currency code (NULL for all)
+ * @param since Start time (NULL for recent)
+ * @param limit Maximum entries to retrieve
+ * @param withdrawals Output withdrawal history array
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_fetch_withdrawals(hl_client_t* client,
+                               const char* currency,
+                               const char* since,
+                               uint32_t limit,
+                               void* withdrawals);
+
 /***************************************************************************
  * EXTENDED MODULES
  ***************************************************************************/
