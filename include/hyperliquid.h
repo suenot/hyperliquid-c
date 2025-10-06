@@ -155,14 +155,25 @@ typedef struct {
 
 /** Market ticker */
 typedef struct {
-    char symbol[32];             /**< Symbol */
+    char symbol[64];             /**< Symbol */
     double last_price;           /**< Last trade price */
     double bid;                  /**< Best bid */
     double ask;                  /**< Best ask */
+    double close;                /**< Close price */
+    double previous_close;       /**< Previous day close price */
     double high_24h;             /**< 24h high */
     double low_24h;              /**< 24h low */
     double volume_24h;           /**< 24h volume */
+    double quote_volume;         /**< 24h quote volume */
     double change_24h;           /**< 24h price change (%) */
+    uint64_t timestamp;          /**< Timestamp (ms) */
+    char datetime[32];           /**< ISO 8601 datetime string */
+
+    // Additional data for perpetuals
+    double mark_price;           /**< Mark price */
+    double oracle_price;         /**< Oracle price */
+    double funding_rate;         /**< Current funding rate */
+    double open_interest;        /**< Open interest */
 } hl_ticker_t;
 
 /** Order book level */
@@ -343,9 +354,9 @@ int hl_get_market_price(hl_client_t *client,
  * @param ticker Ticker info (output)
  * @return HL_SUCCESS on success, error code otherwise
  */
-int hl_get_ticker(hl_client_t *client,
-                  const char *symbol,
-                  hl_ticker_t *ticker);
+hl_error_t hl_get_ticker(hl_client_t *client,
+                        const char *symbol,
+                        hl_ticker_t *ticker);
 
 /**
  * @brief Get order book
@@ -400,6 +411,7 @@ void hl_set_debug(bool enabled);
 
 // Include extended API modules after base types are defined
 #include "hl_account.h"
+#include "hl_markets.h"
 
 #ifdef __cplusplus
 }

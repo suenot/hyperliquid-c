@@ -19,7 +19,9 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(SRC_DIR)/http/client.c \
             $(SRC_DIR)/client.c \
             $(SRC_DIR)/trading_api.c \
-            $(SRC_DIR)/account.c
+            $(SRC_DIR)/account.c \
+            $(SRC_DIR)/markets.c \
+            $(SRC_DIR)/ticker.c
 
 TEST_HELPER_SRCS = $(TEST_DIR)/helpers/test_common.c
 
@@ -155,13 +157,23 @@ test_fetch_positions: $(BIN_DIR)/test_fetch_positions
 	@echo "Running test_fetch_positions..."
 	@$(BIN_DIR)/test_fetch_positions
 
-test_fetch_markets:
-	@echo "❌ test_fetch_markets not yet implemented"
-	@echo "   Location: tests/integration/02_market_data/test_fetch_markets.c"
+$(BIN_DIR)/test_fetch_markets: $(TEST_DIR)/integration/02_market_data/test_fetch_markets.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
 
-test_fetch_ticker:
-	@echo "❌ test_fetch_ticker not yet implemented"
-	@echo "   Location: tests/integration/02_market_data/test_fetch_ticker.c"
+test_fetch_markets: $(BIN_DIR)/test_fetch_markets
+	@echo "Running test_fetch_markets..."
+	@$(BIN_DIR)/test_fetch_markets
+
+$(BIN_DIR)/test_fetch_ticker: $(TEST_DIR)/integration/02_market_data/test_fetch_ticker.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+test_fetch_ticker: $(BIN_DIR)/test_fetch_ticker
+	@echo "Running test_fetch_ticker..."
+	@$(BIN_DIR)/test_fetch_ticker
 
 test_fetch_order_book:
 	@echo "❌ test_fetch_order_book not yet implemented"
@@ -220,6 +232,24 @@ $(BIN_DIR)/example_positions: examples/simple_positions.c $(CORE_OBJS) $(TEST_HE
 example_positions: $(BIN_DIR)/example_positions
 	@echo "Running example_positions..."
 	@$(BIN_DIR)/example_positions
+
+$(BIN_DIR)/example_markets: examples/simple_markets.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+example_markets: $(BIN_DIR)/example_markets
+	@echo "Running example_markets..."
+	@$(BIN_DIR)/example_markets
+
+$(BIN_DIR)/example_ticker: examples/simple_ticker.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+example_ticker: $(BIN_DIR)/example_ticker
+	@echo "Running example_ticker..."
+	@$(BIN_DIR)/example_ticker
 
 # Clean
 clean:
