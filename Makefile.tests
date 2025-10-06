@@ -21,7 +21,8 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(SRC_DIR)/trading_api.c \
             $(SRC_DIR)/account.c \
             $(SRC_DIR)/markets.c \
-            $(SRC_DIR)/ticker.c
+            $(SRC_DIR)/ticker.c \
+            $(SRC_DIR)/orderbook.c
 
 TEST_HELPER_SRCS = $(TEST_DIR)/helpers/test_common.c
 
@@ -175,9 +176,14 @@ test_fetch_ticker: $(BIN_DIR)/test_fetch_ticker
 	@echo "Running test_fetch_ticker..."
 	@$(BIN_DIR)/test_fetch_ticker
 
-test_fetch_order_book:
-	@echo "❌ test_fetch_order_book not yet implemented"
-	@echo "   Location: tests/integration/02_market_data/test_fetch_order_book.c"
+$(BIN_DIR)/test_fetch_order_book: $(TEST_DIR)/integration/02_market_data/test_fetch_order_book.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+test_fetch_order_book: $(BIN_DIR)/test_fetch_order_book
+	@echo "Running test_fetch_order_book..."
+	@$(BIN_DIR)/test_fetch_order_book
 
 test_fetch_ohlcv:
 	@echo "❌ test_fetch_ohlcv not yet implemented"
@@ -250,6 +256,15 @@ $(BIN_DIR)/example_ticker: examples/simple_ticker.c $(CORE_OBJS) $(TEST_HELPER_O
 example_ticker: $(BIN_DIR)/example_ticker
 	@echo "Running example_ticker..."
 	@$(BIN_DIR)/example_ticker
+
+$(BIN_DIR)/example_orderbook: examples/simple_orderbook.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+example_orderbook: $(BIN_DIR)/example_orderbook
+	@echo "Running example_orderbook..."
+	@$(BIN_DIR)/example_orderbook
 
 # Clean
 clean:

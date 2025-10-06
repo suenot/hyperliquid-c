@@ -367,10 +367,10 @@ hl_error_t hl_get_ticker(hl_client_t *client,
  * @param book Order book (output, must be freed with hl_free_orderbook)
  * @return HL_SUCCESS on success, error code otherwise
  */
-int hl_get_orderbook(hl_client_t *client,
-                     const char *symbol,
-                     uint32_t depth,
-                     hl_orderbook_t *book);
+hl_error_t hl_get_orderbook(hl_client_t *client,
+                          const char *symbol,
+                          uint32_t depth,
+                          hl_orderbook_t *book);
 
 /**
  * @brief Free order book
@@ -412,6 +412,7 @@ void hl_set_debug(bool enabled);
 // Include extended API modules after base types are defined
 #include "hl_account.h"
 #include "hl_markets.h"
+#include "hl_orderbook.h"
 
 #ifdef __cplusplus
 }
