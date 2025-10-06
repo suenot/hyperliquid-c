@@ -694,6 +694,61 @@ hl_error_t hl_fetch_open_interest(hl_client_t* client,
 }
 
 /**
+ * @brief Fetch swap markets only
+ */
+hl_error_t hl_fetch_swap_markets(hl_client_t* client, hl_markets_t* markets) {
+    if (!client || !markets) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(markets, 0, sizeof(hl_markets_t));
+
+    // Get all markets first
+    hl_markets_t all_markets = {0};
+    hl_error_t err = hl_fetch_markets(client, &all_markets);
+    if (err != HL_SUCCESS) {
+        return err;
+    }
+
+    // Count swap markets
+    size_t swap_count = 0;
+    for (size_t i = 0; i < all_markets.count; i++) {
+        if (strcmp(all_markets.markets[i].type, "swap") == 0) {
+            swap_count++;
+        }
+    }
+
+    if (swap_count == 0) {
+        hl_markets_free(&all_markets);
+        return HL_SUCCESS; // No swap markets
+    }
+
+    // Allocate swap markets array
+    markets->markets = calloc(swap_count, sizeof(hl_market_t));
+    if (!markets->markets) {
+        hl_markets_free(&all_markets);
+        return HL_ERROR_MEMORY;
+    }
+
+    // Copy swap markets
+    size_t swap_idx = 0;
+    for (size_t i = 0; i < all_markets.count; i++) {
+        if (strcmp(all_markets.markets[i].type, "swap") == 0) {
+            markets->markets[swap_idx] = all_markets.markets[i];
+            swap_idx++;
+        }
+    }
+
+    markets->count = swap_count;
+
+    // Free original array (but not individual markets since we copied them)
+    free(all_markets.markets);
+
+    return HL_SUCCESS;
+}
+
+/**
  * @brief Free open interests array
  */
 void hl_free_open_interests(hl_open_interests_t* interests) {
