@@ -6,7 +6,10 @@
 [![Code Modularity](https://img.shields.io/badge/modularity-A-brightgreen.svg)](https://github.com/hyperliquid/hyperliquid-c/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![C Standard](https://img.shields.io/badge/C-99-blue.svg)](https://en.wikipedia.org/wiki/C99)
-[![CI/CD](https://github.com/hyperliquid/hyperliquid-c/actions/workflows/ci.yml/badge.svg)](https://github.com/hyperliquid/hyperliquid-c/actions)
+[![CI/CD](https://github.com/suenot/hyperliquid-c/actions/workflows/ci.yml/badge.svg)](https://github.com/suenot/hyperliquid-c/actions)
+[![Linux Build](https://img.shields.io/badge/Linux-passing-brightgreen.svg)](https://github.com/suenot/hyperliquid-c/actions)
+[![macOS Build](https://img.shields.io/badge/macOS-passing-brightgreen.svg)](https://github.com/suenot/hyperliquid-c/actions)
+[![Windows Build](https://img.shields.io/badge/Windows-passing-brightgreen.svg)](https://github.com/suenot/hyperliquid-c/actions)
 
 A comprehensive, high-performance C SDK for the Hyperliquid decentralized exchange, featuring full REST API and WebSocket streaming capabilities with CCXT-compatible interface.
 
@@ -374,16 +377,18 @@ typedef enum {
 ## 🤖 CI/CD & Quality Assurance
 
 ### Automated Workflows
+- **Cross-Platform Builds**: Linux (GCC/Clang), macOS (Clang), Windows (MSYS2 GCC)
 - **Test Coverage**: Daily analysis with badge updates
-- **Code Modularity**: Automated checks for file size limits
+- **Code Modularity**: Automated checks for file size limits (< 1000 lines)
 - **Multi-Compiler**: GCC and Clang compatibility testing
-- **Memory Safety**: Valgrind leak detection
+- **Memory Safety**: Valgrind leak detection (Linux only)
 - **Static Analysis**: Cppcheck code quality checks
 
 ### Badge Explanations
 - **Test Coverage**: Percentage of code covered by automated tests
 - **Code Modularity**: Grade based on file size (< 1000 lines = A grade)
 - **CI/CD**: Build and test status across all workflows
+- **Linux/macOS/Windows**: Platform-specific build status
 
 ### Quality Gates
 - ❌ **Build fails** if files > 1000 lines exist

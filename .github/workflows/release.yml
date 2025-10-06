@@ -1,0 +1,106 @@
+name: Release Build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - os: ubuntu-latest
+            compiler: gcc
+            artifact_name: hyperliquid-c-linux-gcc
+            install_deps: |
+              sudo apt-get update
+              sudo apt-get install -y build-essential libcurl4-openssl-dev libjansson-dev libsecp256k1-dev uuid-dev
+
+          - os: ubuntu-latest
+            compiler: clang
+            artifact_name: hyperliquid-c-linux-clang
+            install_deps: |
+              sudo apt-get update
+              sudo apt-get install -y build-essential clang libcurl4-openssl-dev libjansson-dev libsecp256k1-dev uuid-dev
+
+          # macOS builds
+          - os: macos-latest
+            compiler: clang
+            artifact_name: hyperliquid-c-macos-clang
+            install_deps: |
+              brew update
+              brew install curl jansson libsecp256k1 ossp-uuid
+
+          # Windows builds
+          - os: windows-latest
+            compiler: gcc
+            artifact_name: hyperliquid-c-windows-msys2
+            msystem: MINGW64
+            install_deps: |
+              C:\msys64\usr\bin\bash.exe -lc "pacman --noconfirm -Syu"
+              C:\msys64\usr\bin\bash.exe -lc "pacman --noconfirm -S mingw-w64-x86_64-gcc mingw-w64-x86_64-curl mingw-w64-x86_64-jansson mingw-w64-x86_64-libsecp256k1 mingw-w64-x86_64-ossp-uuid"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: ${{ matrix.install_deps }}
+      shell: bash
+
+    - name: Build release version
+      run: |
+        export CC=${{ matrix.compiler }}
+        make clean
+        make CFLAGS="-O3 -DNDEBUG -flto" LDFLAGS="-flto"
+      shell: bash
+      env:
+        MSYSTEM: ${{ matrix.msystem }}
+
+    - name: Run tests
+      run: |
+        make test-unit
+        ./build/bin/test_ccxt_describe
+        ./build/bin/test_crypto_msgpack
+      shell: bash
+      env:
+        MSYSTEM: ${{ matrix.msystem }}
+
+    - name: Create distribution package
+      run: |
+        # Create distribution directory
+        mkdir -p dist/include dist/lib dist/examples
+
+        # Copy headers
+        cp -r include/* dist/include/
+
+        # Copy library
+        cp build/lib/libhyperliquid.a dist/lib/
+
+        # Copy examples
+        cp -r examples/* dist/examples/
+
+        # Copy documentation
+        cp README.md dist/
+        cp LICENSE dist/
+
+        # Create archive
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          7z a ${{ matrix.artifact_name }}.zip dist/*
+        else
+          tar -czf ${{ matrix.artifact_name }}.tar.gz dist/
+        fi
+      shell: bash
+      env:
+        MSYSTEM: ${{ matrix.msystem }}
+
+    - name: Upload release artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: |
+          ${{ matrix.artifact_name }}.tar.gz
+          ${{ matrix.artifact_name }}.zip

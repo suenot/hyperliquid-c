@@ -22,7 +22,17 @@ EXAMPLE_DIR = examples
 LIB_NAME = hyperliquid
 STATIC_LIB = $(LIB_DIR)/lib$(LIB_NAME).a
 SHARED_LIB = $(LIB_DIR)/lib$(LIB_NAME).so
+SHARED_LIB_WIN = $(LIB_DIR)/lib$(LIB_NAME).dll
 VERSION = 1.0.0
+
+# Platform detection
+ifeq ($(OS),Windows_NT)
+    SHARED_LIB_TARGET = $(SHARED_LIB_WIN)
+    LIB_EXT = dll
+else
+    SHARED_LIB_TARGET = $(SHARED_LIB)
+    LIB_EXT = so
+endif
 
 # Source files
 SRCS = $(shell find $(SRC_DIR) -name '*.c')
@@ -38,7 +48,7 @@ EXAMPLE_BINS = $(EXAMPLE_SRCS:$(EXAMPLE_DIR)/%.c=$(BIN_DIR)/%)
 
 # Default target
 .PHONY: all
-all: dirs $(STATIC_LIB) $(SHARED_LIB)
+all: dirs $(STATIC_LIB) $(SHARED_LIB_TARGET)
 
 # Create directories
 .PHONY: dirs
