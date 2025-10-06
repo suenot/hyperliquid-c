@@ -1,5 +1,5 @@
-#include "hyperliquid_action.h"
-#include "crypto_utils.h"
+#include "hl_msgpack.h"
+#include "hl_crypto_internal.h"
 #include <msgpack.h>
 #include <string.h>
 #include <stdio.h>

@@ -8,8 +8,8 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#include "http_client.h"
-#include "logger.h"
+#include "hl_http.h"
+#include "hl_logger.h"
 
 struct http_client {
     CURL *curl;

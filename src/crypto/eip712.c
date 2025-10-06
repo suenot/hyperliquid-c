@@ -1,5 +1,5 @@
-#include "crypto_utils.h"
-#include "logger.h"
+#include "hl_crypto_internal.h"
+#include "hl_logger.h"
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -10,7 +10,7 @@
 #include <secp256k1_recovery.h>
 
 // Keccak256 using SHA3IUF library
-#include "sha3.h"
+#include "hl_crypto_internal.h"
 
 int keccak256(const uint8_t *input, size_t input_len, uint8_t output[32]) {
     // Use SHA3_FLAGS_KECCAK for Ethereum-style Keccak (not NIST SHA3)
