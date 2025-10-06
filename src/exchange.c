@@ -124,6 +124,8 @@ static const hl_capabilities_t HL_CAPABILITIES = {
 
     // Advanced
     .set_leverage = true,
+    .fetch_open_interests = true,
+    .fetch_open_interest = true,
     .add_margin = true,
     .reduce_margin = true,
     .transfer = true,

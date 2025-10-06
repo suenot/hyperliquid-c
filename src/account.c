@@ -614,3 +614,200 @@ hl_error_t hl_fetch_trading_fee(hl_client_t* client, const char* symbol, hl_trad
     return HL_SUCCESS;
 }
 
+// Forward declarations for ledger
+typedef struct hl_ledger_entry hl_ledger_entry_t;
+
+struct hl_ledger_entry {
+    char id[64];               /**< entry ID */
+    char timestamp[32];        /**< timestamp */
+    char datetime[32];         /**< ISO datetime */
+    char currency[16];         /**< currency code */
+    double amount;             /**< amount */
+    double balance;            /**< balance after */
+    char type[32];             /**< entry type */
+    char reference_id[64];     /**< reference transaction ID */
+    char info[1024];           /**< raw exchange data */
+};
+
+typedef struct {
+    hl_ledger_entry_t* entries;
+    size_t count;
+} hl_ledger_t;
+
+/**
+ * @brief Fetch account ledger (transaction history)
+ */
+hl_error_t hl_fetch_ledger(hl_client_t* client,
+                          const char* currency,
+                          const char* since,
+                          uint32_t limit,
+                          hl_ledger_t* ledger) {
+    if (!client || !ledger) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(ledger, 0, sizeof(hl_ledger_t));
+
+    // Prepare request - use userNonFundingLedgerUpdates endpoint
+    char request_body[1024];
+    const char* user_address = hl_client_get_wallet_address_old(client);
+
+    if (!user_address) {
+        return HL_ERROR_AUTH;
+    }
+
+    // Base request
+    char base_request[512];
+    snprintf(base_request, sizeof(base_request),
+             "{\"type\":\"userNonFundingLedgerUpdates\",\"user\":\"%s\"}", user_address);
+
+    // Add time filters if provided
+    if (since && strlen(since) > 0) {
+        char time_filter[256];
+        snprintf(time_filter, sizeof(time_filter), ",\"startTime\":%s", since);
+        strncat(base_request, time_filter, sizeof(base_request) - strlen(base_request) - 1);
+    }
+
+    snprintf(request_body, sizeof(request_body), "%s}", base_request);
+
+    // Make request
+    http_response_t* response = NULL;
+    lv3_error_t err = http_client_post_old(client, "/info", request_body, NULL, &response);
+
+    if (err != LV3_SUCCESS || !response || response->status_code != 200) {
+        if (response) {
+            http_response_free(response);
+        }
+        return HL_ERROR_NETWORK;
+    }
+
+    // Parse JSON response
+    cJSON* json = cJSON_Parse(response->body);
+    if (!json) {
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    // Response is an array of ledger entries
+    if (!cJSON_IsArray(json)) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    int array_size = cJSON_GetArraySize(json);
+    if (array_size == 0) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_SUCCESS; // No entries
+    }
+
+    // Allocate ledger entries array
+    ledger->entries = calloc(array_size, sizeof(hl_ledger_entry_t));
+    if (!ledger->entries) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_MEMORY;
+    }
+
+    // Parse ledger entries
+    size_t valid_entries = 0;
+    for (int i = 0; i < array_size && valid_entries < array_size; i++) {
+        cJSON* entry_json = cJSON_GetArrayItem(json, i);
+        if (!entry_json || !cJSON_IsObject(entry_json)) {
+            continue;
+        }
+
+        hl_ledger_entry_t* entry = &ledger->entries[valid_entries];
+
+        // Extract fields
+        cJSON* time = cJSON_GetObjectItem(entry_json, "time");
+        cJSON* hash = cJSON_GetObjectItem(entry_json, "hash");
+        cJSON* delta = cJSON_GetObjectItem(entry_json, "delta");
+
+        // Set timestamp
+        if (time && cJSON_IsNumber(time)) {
+            snprintf(entry->timestamp, sizeof(entry->timestamp), "%llu", (uint64_t)time->valuedouble);
+            strcpy(entry->datetime, entry->timestamp); // TODO: format properly
+        }
+
+        // Set ID from hash
+        if (hash && cJSON_IsString(hash)) {
+            strncpy(entry->id, hash->valuestring, sizeof(entry->id) - 1);
+            // Extract last part as reference ID
+            char* last_dash = strrchr(hash->valuestring, '-');
+            if (last_dash) {
+                strncpy(entry->reference_id, last_dash + 1, sizeof(entry->reference_id) - 1);
+            }
+        }
+
+        // Parse delta object for amount and currency
+        if (delta && cJSON_IsObject(delta)) {
+            cJSON* coin = cJSON_GetObjectItem(delta, "coin");
+            cJSON* sz = cJSON_GetObjectItem(delta, "sz");
+
+            if (coin && cJSON_IsString(coin)) {
+                // Convert coin to currency (assume USDC for now)
+                if (strcmp(coin->valuestring, "USDC") == 0) {
+                    strcpy(entry->currency, "USDC");
+                } else {
+                    // For crypto assets, use coin name
+                    strncpy(entry->currency, coin->valuestring, sizeof(entry->currency) - 1);
+                }
+            }
+
+            if (sz) {
+                if (cJSON_IsString(sz)) {
+                    entry->amount = atof(sz->valuestring);
+                } else if (cJSON_IsNumber(sz)) {
+                    entry->amount = sz->valuedouble;
+                }
+            }
+        }
+
+        // Set type based on amount sign
+        if (entry->amount > 0) {
+            strcpy(entry->type, "deposit");
+        } else if (entry->amount < 0) {
+            strcpy(entry->type, "withdrawal");
+        } else {
+            strcpy(entry->type, "transfer");
+        }
+
+        // Filter by currency if specified
+        if (currency && strlen(currency) > 0) {
+            if (strcmp(entry->currency, currency) != 0) {
+                continue; // Skip this entry
+            }
+        }
+
+        // Store raw info
+        char* entry_str = cJSON_PrintUnformatted(entry_json);
+        if (entry_str) {
+            strncpy(entry->info, entry_str, sizeof(entry->info) - 1);
+            cJSON_free(entry_str);
+        }
+
+        valid_entries++;
+    }
+
+    ledger->count = valid_entries;
+
+    cJSON_Delete(json);
+    http_response_free(response);
+
+    return HL_SUCCESS;
+}
+
+/**
+ * @brief Free ledger entries array
+ */
+void hl_free_ledger(hl_ledger_t* ledger) {
+    if (ledger && ledger->entries) {
+        free(ledger->entries);
+        ledger->entries = NULL;
+        ledger->count = 0;
+    }
+}
+

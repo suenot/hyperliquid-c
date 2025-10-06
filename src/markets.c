@@ -492,3 +492,214 @@ hl_error_t hl_get_market_by_id(const hl_markets_t* markets, uint32_t asset_id, c
 
     return HL_ERROR_NOT_FOUND;
 }
+
+// Forward declarations for open interest
+typedef struct hl_open_interest hl_open_interest_t;
+
+struct hl_open_interest {
+    char symbol[32];            /**< trading symbol */
+    double open_interest;       /**< current open interest */
+    char timestamp[32];         /**< timestamp */
+    char datetime[32];          /**< ISO datetime */
+    char info[512];             /**< raw exchange data */
+};
+
+typedef struct {
+    hl_open_interest_t* interests;
+    size_t count;
+} hl_open_interests_t;
+
+/**
+ * @brief Fetch open interests for symbols
+ */
+hl_error_t hl_fetch_open_interests(hl_client_t* client,
+                                  const char** symbols,
+                                  size_t symbols_count,
+                                  hl_open_interests_t* interests) {
+    if (!client || !interests) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(interests, 0, sizeof(hl_open_interests_t));
+
+    // Use metaAndAssetCtxs endpoint to get asset contexts with open interest
+    char request_body[256] = "{\"type\":\"metaAndAssetCtxs\"}";
+
+    // Make request
+    http_response_t* response = NULL;
+    lv3_error_t err = http_client_post_old(client, "/info", request_body, NULL, &response);
+
+    if (err != LV3_SUCCESS || !response || response->status_code != 200) {
+        if (response) {
+            http_response_free(response);
+        }
+        return HL_ERROR_NETWORK;
+    }
+
+    // Parse JSON response
+    cJSON* json = cJSON_Parse(response->body);
+    if (!json) {
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    // Response is an array: [meta, assetCtxs]
+    if (!cJSON_IsArray(json) || cJSON_GetArraySize(json) != 2) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    // Get meta and asset contexts
+    cJSON* meta = cJSON_GetArrayItem(json, 0);
+    cJSON* asset_ctxs = cJSON_GetArrayItem(json, 1);
+
+    if (!meta || !cJSON_IsObject(meta) || !asset_ctxs || !cJSON_IsArray(asset_ctxs)) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    // Get universe from meta
+    cJSON* universe = cJSON_GetObjectItem(meta, "universe");
+    if (!universe || !cJSON_IsArray(universe)) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    int universe_size = cJSON_GetArraySize(universe);
+    int ctxs_size = cJSON_GetArraySize(asset_ctxs);
+
+    if (universe_size != ctxs_size) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    // Allocate interests array
+    interests->interests = calloc(ctxs_size, sizeof(hl_open_interest_t));
+    if (!interests->interests) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_MEMORY;
+    }
+
+    // Parse each open interest
+    size_t valid_interests = 0;
+    for (int i = 0; i < ctxs_size && valid_interests < ctxs_size; i++) {
+        cJSON* universe_item = cJSON_GetArrayItem(universe, i);
+        cJSON* ctx_item = cJSON_GetArrayItem(asset_ctxs, i);
+
+        if (!universe_item || !cJSON_IsObject(universe_item) ||
+            !ctx_item || !cJSON_IsObject(ctx_item)) {
+            continue;
+        }
+
+        // Get coin name from universe
+        cJSON* name = cJSON_GetObjectItem(universe_item, "name");
+        if (!name || !cJSON_IsString(name)) {
+            continue;
+        }
+
+        // Check if we should include this symbol
+        bool include_symbol = true;
+        if (symbols && symbols_count > 0) {
+            include_symbol = false;
+            char expected_symbol[64];
+            snprintf(expected_symbol, sizeof(expected_symbol), "%s/USDC:USDC", name->valuestring);
+
+            for (size_t j = 0; j < symbols_count; j++) {
+                if (strcmp(symbols[j], expected_symbol) == 0) {
+                    include_symbol = true;
+                    break;
+                }
+            }
+        }
+
+        if (!include_symbol) {
+            continue;
+        }
+
+        hl_open_interest_t* interest = &interests->interests[valid_interests];
+
+        // Set symbol
+        snprintf(interest->symbol, sizeof(interest->symbol), "%s/USDC:USDC", name->valuestring);
+
+        // Extract open interest from context
+        cJSON* open_interest = cJSON_GetObjectItem(ctx_item, "openInterest");
+
+        if (open_interest) {
+            if (cJSON_IsString(open_interest)) {
+                interest->open_interest = atof(open_interest->valuestring);
+            } else if (cJSON_IsNumber(open_interest)) {
+                interest->open_interest = open_interest->valuedouble;
+            }
+        }
+
+        // Set timestamps
+        hl_current_timestamp(interest->timestamp, sizeof(interest->timestamp));
+        strcpy(interest->datetime, interest->timestamp); // TODO: format properly
+
+        // Store raw context info
+        char* ctx_str = cJSON_PrintUnformatted(ctx_item);
+        if (ctx_str) {
+            strncpy(interest->info, ctx_str, sizeof(interest->info) - 1);
+            cJSON_free(ctx_str);
+        }
+
+        valid_interests++;
+    }
+
+    interests->count = valid_interests;
+
+    cJSON_Delete(json);
+    http_response_free(response);
+
+    return HL_SUCCESS;
+}
+
+/**
+ * @brief Fetch open interest for single symbol
+ */
+hl_error_t hl_fetch_open_interest(hl_client_t* client,
+                                 const char* symbol,
+                                 hl_open_interest_t* interest) {
+    if (!client || !symbol || !interest) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(interest, 0, sizeof(hl_open_interest_t));
+
+    // Use fetch_open_interests with single symbol
+    hl_open_interests_t interests = {0};
+    const char* symbols[] = {symbol};
+
+    hl_error_t err = hl_fetch_open_interests(client, symbols, 1, &interests);
+    if (err != HL_SUCCESS) {
+        return err;
+    }
+
+    if (interests.count == 0) {
+        return HL_ERROR_NOT_FOUND;
+    }
+
+    // Copy first result
+    *interest = interests.interests[0];
+    free(interests.interests);
+
+    return HL_SUCCESS;
+}
+
+/**
+ * @brief Free open interests array
+ */
+void hl_free_open_interests(hl_open_interests_t* interests) {
+    if (interests && interests->interests) {
+        free(interests->interests);
+        interests->interests = NULL;
+        interests->count = 0;
+    }
+}
