@@ -11,15 +11,16 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "hl_error.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Forward declarations (types defined in hyperliquid.h)
-// Note: This header must be included AFTER hl_error_t is defined
+// Forward declarations (types defined in hl_types.h)
 typedef struct hl_client hl_client_t;
-// hl_error_t is defined in hyperliquid.h - no forward declaration needed
+typedef struct hl_balance hl_balance_t;
+typedef struct hl_position hl_position_t;
 
 /**
  * @brief Account types
@@ -50,27 +51,27 @@ typedef struct {
 /**
  * @brief Account balance
  */
-typedef struct {
+struct hl_balance {
     hl_account_type_t type;  /**< Account type */
-    
+
     // Perpetual account fields
     double account_value;    /**< Total account value in USDC */
     double total_margin_used;/**< Total margin used */
     double total_ntl_pos;    /**< Total notional position value */
     double total_raw_usd;    /**< Total raw USD */
     double withdrawable;     /**< Withdrawable amount */
-    
+
     // Cross margin summary
     double cross_account_value;
     double cross_margin_used;
     double cross_maintenance_margin_used;
-    
+
     // Spot balances (only if type == SPOT)
     hl_spot_balance_t* spot_balances;
     size_t spot_balance_count;
-    
+
     uint64_t timestamp;      /**< Response timestamp */
-} hl_balance_t;
+};
 
 /**
  * @brief Position side
@@ -83,21 +84,21 @@ typedef enum {
 /**
  * @brief Open position
  */
-typedef struct {
+struct hl_position {
     char coin[32];           /**< Coin symbol */
     char symbol[64];         /**< Market symbol (e.g., "BTC/USDC:USDC") */
-    
+
     hl_position_side_t side; /**< Position side */
     double size;             /**< Position size (absolute value) */
     double entry_price;      /**< Average entry price */
     double mark_price;       /**< Current mark price */
     double liquidation_price;/**< Liquidation price */
-    
+
     double unrealized_pnl;   /**< Unrealized P&L */
     double margin_used;      /**< Margin used for this position */
     double position_value;   /**< Notional position value */
     double return_on_equity; /**< ROE */
-    
+
     int leverage;            /**< Current leverage */
     int max_leverage;        /**< Max leverage allowed */
     bool is_isolated;        /**< Isolated margin mode */
@@ -106,7 +107,7 @@ typedef struct {
     double cum_funding_all_time;
     double cum_funding_since_open;
     double cum_funding_since_change;
-} hl_position_t;
+};
 
 /**
  * @brief Trading fee information

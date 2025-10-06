@@ -12,19 +12,21 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "hl_error.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Forward declarations (types defined in hyperliquid.h)
+// Forward declarations
 typedef struct hl_client hl_client_t;
-typedef enum hl_error hl_error_t;
+typedef struct hl_ticker hl_ticker_t;
+typedef struct hl_tickers hl_tickers_t;
 
 /**
  * @brief Ticker information
  */
-typedef struct {
+struct hl_ticker {
     char symbol[64];           /**< Market symbol */
 
     // Prices
@@ -46,15 +48,15 @@ typedef struct {
     double oracle_price;       /**< Oracle price */
     double funding_rate;       /**< Current funding rate */
     double open_interest;      /**< Open interest */
-} hl_ticker_t;
+};
 
 /**
  * @brief Tickers collection
  */
-typedef struct {
-    hl_ticker_t* tickers;      /**< Array of tickers */
+struct hl_tickers {
+    struct hl_ticker* tickers; /**< Array of tickers */
     size_t count;              /**< Number of tickers */
-} hl_tickers_t;
+};
 
 // ============================================================================
 // Ticker API

@@ -12,13 +12,16 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "hl_error.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Forward declarations (types defined in hyperliquid.h)
-// Note: hl_client_t and hl_error_t are defined in hyperliquid.h
+// Forward declarations
+typedef struct hl_client hl_client_t;
+typedef struct hl_market hl_market_t;
+typedef struct hl_markets hl_markets_t;
 
 /**
  * @brief Market type
@@ -31,7 +34,7 @@ typedef enum {
 /**
  * @brief Market information
  */
-typedef struct {
+struct hl_market {
     char symbol[64];           /**< Unified symbol (e.g., "BTC/USDC:USDC") */
     char base[32];             /**< Base currency (e.g., "BTC") */
     char quote[32];            /**< Quote currency (e.g., "USDC") */
@@ -58,15 +61,15 @@ typedef struct {
     // Volumes
     double day_volume;         /**< 24h volume */
     double open_interest;      /**< Open interest (for swaps) */
-} hl_market_t;
+};
 
 /**
  * @brief Markets collection
  */
-typedef struct {
-    hl_market_t* markets;      /**< Array of markets */
+struct hl_markets {
+    struct hl_market* markets; /**< Array of markets */
     size_t count;              /**< Number of markets */
-} hl_markets_t;
+};
 
 // ============================================================================
 // Markets API

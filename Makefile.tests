@@ -44,7 +44,7 @@ CORE_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(CORE_SRCS))
 TEST_HELPER_OBJS = $(patsubst $(TEST_DIR)/%.c,$(OBJ_DIR)/test/%.o,$(TEST_HELPER_SRCS))
 
 # Test categories
-UNIT_TESTS = test_crypto_msgpack
+UNIT_TESTS = test_crypto_msgpack test_types test_account_types test_market_types
 INTEGRATION_TESTS = test_connection \
                     test_create_cancel_order \
                     test_trading_comprehensive \
@@ -102,14 +102,19 @@ test-report:
 	@echo "║  Hyperliquid C SDK - Test Coverage    ║"
 	@echo "╚════════════════════════════════════════╝"
 	@echo ""
-	@echo "Phase 1 (Foundation):  1/4   (25%)  ⏳"
+	@echo "Phase 1 (Foundation):  4/4   (100%) ✅"
 	@echo "Phase 2 (Connection):  1/1   (100%) ✅"
 	@echo "Phase 3 (Trading):     1/2   (50%)  ⏳"
 	@echo "Phase 4 (High Pri):    0/20  (0%)   📋"
 	@echo "Phase 5 (Medium Pri):  0/18  (0%)   📌"
 	@echo "Phase 6 (Low Pri):     0/6   (0%)   📌"
 	@echo ""
-	@echo "Total: 3/51 (5.9%)"
+	@echo "Total: 6/51 (11.8%) - IMPROVED! 🎯"
+	@echo ""
+	@echo "Recently added:"
+	@echo "  ✅ test_types (basic types and error codes)"
+	@echo "  ✅ test_account_types (balance/position structures)"
+	@echo "  ✅ test_market_types (ticker/OHLCV/market structures)"
 	@echo ""
 	@echo "Next to implement:"
 	@echo "  - test_fetch_balance"
@@ -136,6 +141,34 @@ $(BIN_DIR)/test_crypto_msgpack: $(TEST_DIR)/unit/test_crypto_msgpack.c $(CORE_OB
 test_crypto_msgpack: $(BIN_DIR)/test_crypto_msgpack
 	@echo "Running test_crypto_msgpack..."
 	@$(BIN_DIR)/test_crypto_msgpack
+
+# Simple unit tests
+$(BIN_DIR)/test_types: $(TEST_DIR)/test_types.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_types: $(BIN_DIR)/test_types
+	@echo "Running test_types..."
+	@$(BIN_DIR)/test_types
+
+$(BIN_DIR)/test_account_types: $(TEST_DIR)/test_account_types.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_account_types: $(BIN_DIR)/test_account_types
+	@echo "Running test_account_types..."
+	@$(BIN_DIR)/test_account_types
+
+$(BIN_DIR)/test_market_types: $(TEST_DIR)/test_market_types.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_market_types: $(BIN_DIR)/test_market_types
+	@echo "Running test_market_types..."
+	@$(BIN_DIR)/test_market_types
 
 # Integration tests - Connection
 $(BIN_DIR)/test_connection: $(TEST_DIR)/integration/01_connection/test_connection.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
@@ -258,7 +291,7 @@ test_fetch_ohlcv: $(BIN_DIR)/test_fetch_ohlcv
 	@$(BIN_DIR)/test_fetch_ohlcv
 
 # Test suites
-test-unit: test_crypto_msgpack
+test-unit: test_crypto_msgpack test_types test_account_types test_market_types
 	@echo ""
 	@echo "✅ All unit tests passed"
 

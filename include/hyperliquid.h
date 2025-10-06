@@ -41,6 +41,7 @@ extern "C" {
 // Core CCXT-compatible includes
 #include "hl_exchange.h"
 #include "hl_types.h"
+#include "hl_error.h"
 #include "hl_client.h"
 
 // Legacy includes (for backward compatibility)
@@ -62,28 +63,8 @@ extern "C" {
 #define HL_VERSION_STRING "1.0.0"
 
 /***************************************************************************
- * ERROR CODES
+ * ERROR CODES - now in hl_error.h
  ***************************************************************************/
-
-typedef enum {
-    HL_SUCCESS = 0,              /**< Operation successful */
-    HL_ERROR_INVALID_PARAMS = -1, /**< Invalid parameters */
-    HL_ERROR_NETWORK = -2,       /**< Network error */
-    HL_ERROR_API = -3,           /**< API error */
-    HL_ERROR_AUTH = -4,          /**< Authentication error */
-    HL_ERROR_INSUFFICIENT_BALANCE = -5, /**< Insufficient balance */
-    HL_ERROR_INVALID_SYMBOL = -6, /**< Invalid trading symbol */
-    HL_ERROR_ORDER_REJECTED = -7, /**< Order rejected by exchange */
-    HL_ERROR_SIGNATURE = -8,     /**< Signature generation failed */
-    HL_ERROR_MSGPACK = -9,       /**< MessagePack error */
-    HL_ERROR_JSON = -10,         /**< JSON parsing error */
-    HL_ERROR_MEMORY = -11,       /**< Memory allocation failed */
-    HL_ERROR_TIMEOUT = -12,      /**< Operation timed out */
-    HL_ERROR_NOT_IMPLEMENTED = -13, /**< Feature not implemented */
-    HL_ERROR_NOT_FOUND = -14,    /**< Resource not found */
-    HL_ERROR_PARSE = -15         /**< Response parsing error */
-} hl_error_t;
-#define HL_ERROR_T_DEFINED
 
 /***************************************************************************
  * ENUMS
@@ -151,58 +132,11 @@ typedef struct {
     char error[256];             /**< Error message (if any) */
 } hl_cancel_result_t;
 
-// Balance and Position types moved to hl_account.h
+// Balance, Position, and Trade types moved to separate headers
 
-/** Trade info */
-typedef struct {
-    uint64_t trade_id;           /**< Trade ID */
-    uint64_t order_id;           /**< Order ID */
-    char symbol[32];             /**< Symbol */
-    hl_side_t side;              /**< Buy or sell */
-    double price;                /**< Trade price */
-    double quantity;             /**< Trade quantity */
-    double fee;                  /**< Trading fee */
-    uint64_t timestamp_ms;       /**< Timestamp (milliseconds) */
-} hl_trade_t;
-
-/** Market ticker */
-typedef struct {
-    char symbol[64];             /**< Symbol */
-    double last_price;           /**< Last trade price */
-    double bid;                  /**< Best bid */
-    double ask;                  /**< Best ask */
-    double close;                /**< Close price */
-    double previous_close;       /**< Previous day close price */
-    double high_24h;             /**< 24h high */
-    double low_24h;              /**< 24h low */
-    double volume_24h;           /**< 24h volume */
-    double quote_volume;         /**< 24h quote volume */
-    double change_24h;           /**< 24h price change (%) */
-    uint64_t timestamp;          /**< Timestamp (ms) */
-    char datetime[32];           /**< ISO 8601 datetime string */
-
-    // Additional data for perpetuals
-    double mark_price;           /**< Mark price */
-    double oracle_price;         /**< Oracle price */
-    double funding_rate;         /**< Current funding rate */
-    double open_interest;        /**< Open interest */
-} hl_ticker_t;
-
-/** Order book level */
-typedef struct {
-    double price;                /**< Price level */
-    double quantity;             /**< Quantity at this level */
-} hl_book_level_t;
-
-/** Order book */
-typedef struct {
-    char symbol[32];             /**< Symbol */
-    hl_book_level_t *bids;       /**< Bid levels (sorted high to low) */
-    size_t bids_count;           /**< Number of bid levels */
-    hl_book_level_t *asks;       /**< Ask levels (sorted low to high) */
-    size_t asks_count;           /**< Number of ask levels */
-    uint64_t timestamp_ms;       /**< Snapshot timestamp */
-} hl_orderbook_t;
+// Legacy ticker and orderbook types - moved to separate headers
+// typedef struct hl_ticker hl_ticker_t;
+// typedef struct hl_orderbook hl_orderbook_t;
 
 /***************************************************************************
  * CLIENT MANAGEMENT
@@ -398,12 +332,7 @@ void hl_free_orderbook(hl_orderbook_t *book);
  */
 void hl_free_orders(hl_orders_t *orders);
 
-/**
- * @brief Free trades array
- *
- * @param trades Trades array allocated by fetch functions
- */
-void hl_free_trades(hl_trades_t *trades);
+// hl_free_trades declared above
 
 /***************************************************************************
  * ORDER MANAGEMENT

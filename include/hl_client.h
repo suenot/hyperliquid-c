@@ -8,6 +8,7 @@
 
 #include "hl_exchange.h"
 #include "hl_types.h"
+#include "hl_error.h"
 #include <stdbool.h>
 
 // Forward declarations

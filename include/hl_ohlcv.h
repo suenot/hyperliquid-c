@@ -12,35 +12,38 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "hl_error.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Forward declarations (types defined in hyperliquid.h)
-// Note: hl_client_t, hl_error_t are defined in hyperliquid.h
+// Forward declarations
+typedef struct hl_client hl_client_t;
+typedef struct hl_ohlcv hl_ohlcv_t;
+typedef struct hl_ohlcvs hl_ohlcvs_t;
 
 /**
  * @brief OHLCV candlestick data
  */
-typedef struct {
+struct hl_ohlcv {
     uint64_t timestamp;    /**< Candle open timestamp (milliseconds) */
     double open;           /**< Open price */
     double high;           /**< High price */
     double low;            /**< Low price */
     double close;          /**< Close price */
     double volume;         /**< Trading volume */
-} hl_ohlcv_t;
+};
 
 /**
  * @brief OHLCV data collection
  */
-typedef struct {
-    hl_ohlcv_t* candles;   /**< Array of OHLCV candles */
+struct hl_ohlcvs {
+    struct hl_ohlcv* candles; /**< Array of OHLCV candles */
     size_t count;          /**< Number of candles */
     char symbol[64];       /**< Trading symbol */
     char timeframe[16];    /**< Timeframe (e.g., "1m", "1h", "1d") */
-} hl_ohlcvs_t;
+};
 
 /**
  * @brief Timeframe constants
