@@ -321,8 +321,8 @@ MIT License - see [LICENSE](LICENSE) file
 
 ## Contact
 
-- Issues: [GitHub Issues](https://github.com/yourusername/hyperliquid-c/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/hyperliquid-c/discussions)
+- Issues: [GitHub Issues](https://github.com/suenot/hyperliquid-c/issues)
+- Discussions: [GitHub Discussions](https://github.com/suenot/hyperliquid-c/discussions)
 
 ## Disclaimer
 
