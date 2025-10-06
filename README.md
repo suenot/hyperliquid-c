@@ -2,8 +2,8 @@
 
 [![CCXT Compatible](https://img.shields.io/badge/CCXT-Compatible-brightgreen.svg)](https://github.com/ccxt/ccxt)
 [![Methods: 51/51](https://img.shields.io/badge/Methods-51%2F51%20100%25-blue.svg)]()
-[![Test Coverage](https://img.shields.io/badge/coverage-85.3%25-yellow.svg)](https://github.com/hyperliquid/hyperliquid-c/actions)
-[![Code Modularity](https://img.shields.io/badge/modularity-A-brightgreen.svg)](https://github.com/hyperliquid/hyperliquid-c/actions)
+[![Test Coverage](https://img.shields.io/badge/coverage-85.3%25-yellow.svg)](https://github.com/suenot/hyperliquid-c/actions)
+[![Code Modularity](https://img.shields.io/badge/modularity-A-brightgreen.svg)](https://github.com/suenot/hyperliquid-c/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![C Standard](https://img.shields.io/badge/C-99-blue.svg)](https://en.wikipedia.org/wiki/C99)
 [![CI/CD](https://github.com/suenot/hyperliquid-c/actions/workflows/ci.yml/badge.svg)](https://github.com/suenot/hyperliquid-c/actions)
