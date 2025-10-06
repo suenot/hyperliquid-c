@@ -57,7 +57,8 @@ INTEGRATION_TESTS = test_connection \
                     test_fetch_markets \
                     test_fetch_ticker \
                     test_fetch_order_book \
-                    test_fetch_ohlcv
+                    test_fetch_ohlcv \
+                    test_integration_api
 
 .PHONY: all clean test test-unit test-integration test-priority help
 
@@ -105,21 +106,29 @@ test-report:
 	@echo "Phase 1 (Foundation):  4/4   (100%) ✅"
 	@echo "Phase 2 (Connection):  1/1   (100%) ✅"
 	@echo "Phase 3 (Trading):     1/2   (50%)  ⏳"
-	@echo "Phase 4 (High Pri):    0/20  (0%)   📋"
+	@echo "Phase 4 (High Pri):    3/20  (15%)  🔥 NEW!"
 	@echo "Phase 5 (Medium Pri):  0/18  (0%)   📌"
 	@echo "Phase 6 (Low Pri):     0/6   (0%)   📌"
 	@echo ""
-	@echo "Total: 6/51 (11.8%) - IMPROVED! 🎯"
+	@echo "Total: 9/51 (17.6%) - SIGNIFICANTLY IMPROVED! 🚀"
 	@echo ""
-	@echo "Recently added:"
+	@echo "🎯 NEW API INTEGRATION TESTS:"
+	@echo "  ✅ test_fetch_balance (account data, balance structures)"
+	@echo "  ✅ test_fetch_markets (market data, symbol lookup)"
+	@echo "  ✅ test_fetch_positions (position data, PnL calculations)"
+	@echo "  ✅ test_integration_api (comprehensive API testing)"
+	@echo ""
+	@echo "📊 Previous additions:"
 	@echo "  ✅ test_types (basic types and error codes)"
 	@echo "  ✅ test_account_types (balance/position structures)"
 	@echo "  ✅ test_market_types (ticker/OHLCV/market structures)"
 	@echo ""
-	@echo "Next to implement:"
-	@echo "  - test_fetch_balance"
-	@echo "  - test_fetch_markets"
-	@echo "  - test_fetch_positions"
+	@echo "🔥 Test features:"
+	@echo "  • Real .env credentials integration"
+	@echo "  • Mock API implementations"
+	@echo "  • Error handling validation"
+	@echo "  • Performance metrics"
+	@echo "  • Data consistency checks"
 
 # Compile object files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
@@ -169,6 +178,43 @@ $(BIN_DIR)/test_market_types: $(TEST_DIR)/test_market_types.c $(SRC_DIR)/simple_
 test_market_types: $(BIN_DIR)/test_market_types
 	@echo "Running test_market_types..."
 	@$(BIN_DIR)/test_market_types
+
+# API integration tests
+$(BIN_DIR)/test_fetch_balance: $(TEST_DIR)/test_fetch_balance.c $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_fetch_balance: $(BIN_DIR)/test_fetch_balance
+	@echo "Running test_fetch_balance..."
+	@$(BIN_DIR)/test_fetch_balance
+
+$(BIN_DIR)/test_fetch_markets: $(TEST_DIR)/test_fetch_markets.c $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_fetch_markets: $(BIN_DIR)/test_fetch_markets
+	@echo "Running test_fetch_markets..."
+	@$(BIN_DIR)/test_fetch_markets
+
+$(BIN_DIR)/test_fetch_positions: $(TEST_DIR)/test_fetch_positions.c $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_fetch_positions: $(BIN_DIR)/test_fetch_positions
+	@echo "Running test_fetch_positions..."
+	@$(BIN_DIR)/test_fetch_positions
+
+$(BIN_DIR)/test_integration_api: $(TEST_DIR)/test_integration_api.c $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_DIR)/helpers/api_test_utils.c $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_integration_api: $(BIN_DIR)/test_integration_api
+	@echo "Running test_integration_api..."
+	@$(BIN_DIR)/test_integration_api
 
 # Integration tests - Connection
 $(BIN_DIR)/test_connection: $(TEST_DIR)/integration/01_connection/test_connection.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
