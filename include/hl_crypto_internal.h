@@ -2,6 +2,8 @@
 #define SHA3_H
 
 #include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 /* -------------------------------------------------------------------------
  * Works when compiled for either 32-bit or 64-bit targets, optimized for 
@@ -69,5 +71,16 @@ sha3_return_t sha3_HashBuffer(
     enum SHA3_FLAGS flags, /* SHA3_FLAGS_NONE or SHA3_FLAGS_KECCAK */
     const void *in, unsigned inBytes, 
     void *out, unsigned outBytes );     /* up to bitSize/8; truncation OK */
+
+/* Additional crypto functions from crypto_utils.c */
+int keccak256(const uint8_t *input, size_t input_len, uint8_t output[32]);
+int hex_to_bytes(const char *hex, uint8_t *bytes_out, size_t max_out_len);
+void bytes_to_hex(const uint8_t *bytes, size_t len, char *hex_out, bool add_prefix);
+int parse_eth_address(const char *address_hex, uint8_t address_out[20]);
+int ecdsa_sign_secp256k1(const uint8_t hash[32], const char *private_key_hex, uint8_t signature_out[65]);
+int eip712_domain_hash(const char *domain_name, uint64_t chain_id, uint8_t domain_hash_out[32]);
+int eip712_agent_struct_hash(const char *source, const uint8_t connection_id[32], uint8_t struct_hash_out[32]);
+int eip712_signing_hash(const uint8_t domain_hash[32], const uint8_t struct_hash[32], uint8_t signing_hash_out[32]);
+int eip712_sign_agent(const char *domain_name, uint64_t chain_id, const char *source, const uint8_t connection_id[32], const char *private_key_hex, uint8_t signature_out[65]);
 
 #endif
