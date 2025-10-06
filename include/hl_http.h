@@ -36,6 +36,16 @@ typedef struct {
     size_t headers_size;
 } http_response_t;
 
+// HTTP request (for internal use with old trading code)
+typedef struct {
+    char method[16];
+    char url[2048];
+    char *headers;
+    char *body;
+    int timeout_ms;
+    char *proxy;
+} http_request_t;
+
 /**
  * @brief HTTP client configuration
  */
@@ -83,6 +93,10 @@ lv3_error_t http_client_get(http_client_t *client, const char *url, http_respons
  * @return LV3_SUCCESS on success, error code on failure
  */
 lv3_error_t http_client_post(http_client_t *client, const char *url, const char *body, const char *headers, http_response_t *response);
+
+// Compatibility functions for old trading code
+lv3_error_t http_client_get_compat(http_client_t *client, const http_request_t *request, http_response_t *response);
+lv3_error_t http_client_post_compat(http_client_t *client, const http_request_t *request, http_response_t *response);
 
 /**
  * @brief Free HTTP response memory

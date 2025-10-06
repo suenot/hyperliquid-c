@@ -120,12 +120,18 @@ typedef struct {
 
 /** Order result */
 typedef struct {
-    uint64_t order_id;           /**< Order ID (0 if market order filled) */
+    char *order_id;              /**< Order ID (allocated string, caller must free) */
     hl_order_status_t status;    /**< Order status */
     double filled_quantity;      /**< Filled quantity */
-    double avg_fill_price;       /**< Average fill price */
+    double average_price;        /**< Average fill price */
     char error[256];             /**< Error message (if any) */
 } hl_order_result_t;
+
+/** Cancel result */
+typedef struct {
+    bool cancelled;              /**< True if order was cancelled successfully */
+    char error[256];             /**< Error message (if any) */
+} hl_cancel_result_t;
 
 /** Account balance */
 typedef struct {
@@ -237,13 +243,13 @@ void hl_set_timeout(hl_client_t *client, uint32_t timeout_ms);
  * @brief Place order
  * 
  * @param client Client handle
- * @param order Order request
+ * @param request Order request
  * @param result Order result (output)
  * @return HL_SUCCESS on success, error code otherwise
  * 
  * Example:
  * ```c
- * hl_order_request_t order = {
+ * hl_order_request_t request = {
  *     .symbol = "BTC",
  *     .side = HL_SIDE_BUY,
  *     .price = 95000.0,
@@ -253,26 +259,28 @@ void hl_set_timeout(hl_client_t *client, uint32_t timeout_ms);
  *     .reduce_only = false
  * };
  * hl_order_result_t result;
- * if (hl_place_order(client, &order, &result) == HL_SUCCESS) {
- *     printf("Order ID: %llu\n", result.order_id);
+ * if (hl_place_order(client, &request, &result) == HL_SUCCESS) {
+ *     printf("Order ID: %s\n", result.order_id);
  * }
  * ```
  */
-int hl_place_order(hl_client_t *client, 
-                   const hl_order_request_t *order,
-                   hl_order_result_t *result);
+hl_error_t hl_place_order(hl_client_t *client, 
+                          const hl_order_request_t *request,
+                          hl_order_result_t *result);
 
 /**
  * @brief Cancel order
  * 
  * @param client Client handle
  * @param symbol Trading symbol
- * @param order_id Order ID to cancel
+ * @param order_id Order ID to cancel (string)
+ * @param result Cancel result (output)
  * @return HL_SUCCESS on success, error code otherwise
  */
-int hl_cancel_order(hl_client_t *client,
-                    const char *symbol,
-                    uint64_t order_id);
+hl_error_t hl_cancel_order(hl_client_t *client,
+                           const char *symbol,
+                           const char *order_id,
+                           hl_cancel_result_t *result);
 
 /**
  * @brief Cancel all orders for symbol

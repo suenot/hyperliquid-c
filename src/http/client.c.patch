@@ -1,0 +1,62 @@
+51c51
+< lv3_error_t http_client_create(const http_client_config_t *config, http_client_t **client_out) {
+---
+> lv3_error_t http_client_create_old(const http_client_config_t *config, http_client_t **client_out) {
+258c258
+< lv3_error_t http_client_get(http_client_t *client, const http_request_t *request, http_response_t *response) {
+---
+> lv3_error_t http_client_get_old(http_client_t *client, const http_request_t *request, http_response_t *response) {
+270c270
+< lv3_error_t http_client_post(http_client_t *client, const http_request_t *request, http_response_t *response) {
+---
+> lv3_error_t http_client_post_old(http_client_t *client, const http_request_t *request, http_response_t *response) {
+324,344c324,344
+< 
+< // New API wrappers for hyperliquid-c SDK
+< 
+< http_client_t* http_client_create_new(void) {
+<     http_client_t* client = NULL;
+<     http_client_create(NULL, &client);
+<     return client;
+< }
+< 
+< lv3_error_t http_client_get_new(http_client_t *client, const char *url, http_response_t *response) {
+<     http_request_t req = {0};
+<     strncpy(req.url, url, sizeof(req.url) - 1);
+<     strncpy(req.method, "GET", sizeof(req.method) - 1);
+<     return http_client_get(client, &req, response);
+< }
+< 
+< lv3_error_t http_client_post_new(http_client_t *client, const char *url, const char *body, const char *headers, http_response_t *response) {
+<     http_request_t req = {0};
+<     strncpy(req.url, url, sizeof(req.url) - 1);
+<     strncpy(req.method, "POST", sizeof(req.method) - 1);
+<     req.body = (char*)body;
+---
+> 
+> // New API wrappers for hyperliquid-c SDK
+> 
+> http_client_t* http_client_create(void) {
+>     http_client_t* client = NULL;
+>     http_client_create_old(NULL, &client);
+>     return client;
+> }
+> 
+> lv3_error_t http_client_get(http_client_t *client, const char *url, http_response_t *response) {
+>     http_request_t req = {0};
+>     strncpy(req.url, url, sizeof(req.url) - 1);
+>     strncpy(req.method, "GET", sizeof(req.method) - 1);
+>     return http_client_get_old(client, &req, response);
+> }
+> 
+> lv3_error_t http_client_post(http_client_t *client, const char *url, const char *body, const char *headers, http_response_t *response) {
+>     http_request_t req = {0};
+>     strncpy(req.url, url, sizeof(req.url) - 1);
+>     strncpy(req.method, "POST", sizeof(req.method) - 1);
+>     req.body = (char*)body;
+346,347c346,347
+<     return http_client_post(client, &req, response);
+< }
+---
+>     return http_client_post_old(client, &req, response);
+> }

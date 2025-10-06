@@ -60,7 +60,7 @@ static lv3_error_t hyperliquid_make_request(hyperliquid_data_t *data,
                                              const char *json_body,
                                              http_response_t *response) {
     if (!data || !endpoint || !response) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     // Create request
@@ -103,7 +103,7 @@ static lv3_error_t hyperliquid_get_market_price(exchange_trader_t *trader,
                                                  const char *symbol,
                                                  double *price_out) {
     if (!trader || !symbol || !price_out) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     *price_out = 0.0;
@@ -183,7 +183,7 @@ static lv3_error_t hyperliquid_calculate_quantity(exchange_trader_t *trader,
                                                    char *quantity_out,
                                                    size_t quantity_size) {
     if (!trader || !symbol || !quantity_out) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     // Get current market price
@@ -225,7 +225,7 @@ static lv3_error_t hyperliquid_place_limit_order(exchange_trader_t *trader,
                                                   char *order_id_out,
                                                   size_t order_id_size) {
     if (!trader || !symbol || !side || !order_id_out) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     order_id_out[0] = '\0';
@@ -394,7 +394,7 @@ static lv3_error_t hyperliquid_cancel_order(exchange_trader_t *trader,
                                              const char *symbol,
                                              const char *order_id) {
     if (!trader || !symbol || !order_id) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     hyperliquid_data_t *data = (hyperliquid_data_t*)trader->exchange_data;
@@ -525,7 +525,7 @@ static lv3_error_t hyperliquid_execute_trade(exchange_trader_t *trader,
                                               double sl_percent __attribute__((unused)),
                                               order_result_t *result) {
     if (!trader || !symbol || !direction || !result) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     // hyperliquid_data_t *data = (hyperliquid_data_t*)trader->exchange_data;
@@ -630,7 +630,7 @@ static lv3_error_t hyperliquid_get_balance(exchange_trader_t *trader,
                                             char *balance_json_out,
                                             size_t json_size) {
     if (!trader || !balance_json_out) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     hyperliquid_data_t *data = (hyperliquid_data_t*)trader->exchange_data;
@@ -654,7 +654,7 @@ static lv3_error_t hyperliquid_get_balance(exchange_trader_t *trader,
         lv3_string_copy(balance_json_out, response.body, json_size);
         result = LV3_SUCCESS;
     } else {
-        result = LV3_ERROR_INVALID_PARAM;
+        result = LV3_ERROR_INVALID_PARAMS;
     }
     
     http_response_free(&response);
@@ -668,7 +668,7 @@ static lv3_error_t hyperliquid_get_positions(exchange_trader_t *trader,
                                               char *positions_json_out,
                                               size_t json_size) {
     if (!trader || !positions_json_out) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     hyperliquid_data_t *data = (hyperliquid_data_t*)trader->exchange_data;
@@ -701,7 +701,7 @@ static lv3_error_t hyperliquid_get_positions(exchange_trader_t *trader,
             lv3_string_copy(positions_json_out, positions_str, json_size);
             result = LV3_SUCCESS;
         } else {
-            result = LV3_ERROR_INVALID_PARAM;
+            result = LV3_ERROR_INVALID_PARAMS;
         }
         if (positions_str) free(positions_str);
     } else {
@@ -721,7 +721,7 @@ static lv3_error_t hyperliquid_get_trade_history(exchange_trader_t *trader,
                                                   char *history_json_out,
                                                   size_t json_size) {
     if (!trader || !history_json_out) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     hyperliquid_data_t *data = (hyperliquid_data_t*)trader->exchange_data;
@@ -745,7 +745,7 @@ static lv3_error_t hyperliquid_get_trade_history(exchange_trader_t *trader,
         lv3_string_copy(history_json_out, response.body, json_size);
         result = LV3_SUCCESS;
     } else {
-        result = LV3_ERROR_INVALID_PARAM;
+        result = LV3_ERROR_INVALID_PARAMS;
     }
     
     http_response_free(&response);
@@ -760,7 +760,7 @@ lv3_error_t hyperliquid_trader_create(const char *wallet_address,
                                        bool testnet,
                                        exchange_trader_t **trader_out) {
     if (!wallet_address || !private_key || !trader_out) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     exchange_trader_t *trader = lv3_calloc(1, sizeof(exchange_trader_t));

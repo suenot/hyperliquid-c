@@ -9,6 +9,7 @@
 #include <curl/curl.h>
 
 #include "hl_http.h"
+#include "hl_internal.h"
 #include "hl_logger.h"
 
 struct http_client {
@@ -49,7 +50,7 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb, curl_res
  * @brief Create HTTP client instance
  */
 lv3_error_t http_client_create(const http_client_config_t *config, http_client_t **client_out) {
-    if (!client_out) return LV3_ERROR_INVALID_PARAM;
+    if (!client_out) return LV3_ERROR_INVALID_PARAMS;
     
     // Initialize curl globally if not done
     static bool curl_initialized = false;
@@ -120,7 +121,7 @@ void http_client_destroy(http_client_t *client) {
  * @brief Set proxy for HTTP client
  */
 lv3_error_t http_client_set_proxy(http_client_t *client, const char *proxy_url) {
-    if (!client) return LV3_ERROR_INVALID_PARAM;
+    if (!client) return LV3_ERROR_INVALID_PARAMS;
     
     if (proxy_url) {
         curl_easy_setopt(client->curl, CURLOPT_PROXY, proxy_url);
@@ -137,7 +138,7 @@ lv3_error_t http_client_set_proxy(http_client_t *client, const char *proxy_url) 
  * @brief Parse proxy string and create URL
  */
 static lv3_error_t parse_proxy_string(const char *proxy_str, char *proxy_url, size_t url_size) {
-    if (!proxy_str || !proxy_url) return LV3_ERROR_INVALID_PARAM;
+    if (!proxy_str || !proxy_url) return LV3_ERROR_INVALID_PARAMS;
     
     // Parse format: "protocol:host:port:user:pass:status"
     char temp[512];
@@ -153,7 +154,7 @@ static lv3_error_t parse_proxy_string(const char *proxy_str, char *proxy_url, si
     }
     
     if (part_count < 3) {
-        return LV3_ERROR_INVALID_PARAM;
+        return LV3_ERROR_INVALID_PARAMS;
     }
     
     const char *protocol = parts[0];
@@ -176,7 +177,7 @@ static lv3_error_t parse_proxy_string(const char *proxy_str, char *proxy_url, si
  */
 static lv3_error_t http_request_internal(http_client_t *client, const http_request_t *request, 
                                         http_response_t *response) {
-    if (!client || !request || !response) return LV3_ERROR_INVALID_PARAM;
+    if (!client || !request || !response) return LV3_ERROR_INVALID_PARAMS;
     
     memset(response, 0, sizeof(http_response_t));
     
@@ -223,7 +224,7 @@ static lv3_error_t http_request_internal(http_client_t *client, const http_reque
     CURLcode res = curl_easy_perform(client->curl);
     
     // Record response time
-    response->response_time_ms = (int)(lv3_current_time_ms() - start_time);
+    // response->response_time_ms = (int)(lv3_current_time_ms() - start_time);
     
     // Clean up headers
     if (headers) {
@@ -244,10 +245,10 @@ static lv3_error_t http_request_internal(http_client_t *client, const http_reque
     
     // Set response data
     response->body = curl_response.data;
-    response->content_length = curl_response.size;
+    response->body_size = curl_response.size;
     
     LV3_LOG_DEBUG("HTTP %s %s -> %d (%dms)", request->method, request->url, 
-                 response->status_code, response->response_time_ms);
+                 response->status_code, // response->response_time_ms);
     
     return LV3_SUCCESS;
 }
@@ -256,7 +257,7 @@ static lv3_error_t http_request_internal(http_client_t *client, const http_reque
  * @brief Make HTTP GET request
  */
 lv3_error_t http_client_get(http_client_t *client, const http_request_t *request, http_response_t *response) {
-    if (!request) return LV3_ERROR_INVALID_PARAM;
+    if (!request) return LV3_ERROR_INVALID_PARAMS;
     
     http_request_t get_request = *request;
     lv3_string_copy(get_request.method, "GET", sizeof(get_request.method));
@@ -268,7 +269,7 @@ lv3_error_t http_client_get(http_client_t *client, const http_request_t *request
  * @brief Make HTTP POST request
  */
 lv3_error_t http_client_post(http_client_t *client, const http_request_t *request, http_response_t *response) {
-    if (!request) return LV3_ERROR_INVALID_PARAM;
+    if (!request) return LV3_ERROR_INVALID_PARAMS;
     
     http_request_t post_request = *request;
     lv3_string_copy(post_request.method, "POST", sizeof(post_request.method));
@@ -292,9 +293,9 @@ void http_response_free(http_response_t *response) {
         response->body = NULL;
     }
     
-    response->content_length = 0;
+    response->body_size = 0;
     response->status_code = 0;
-    response->response_time_ms = 0;
+    // response->response_time_ms = 0;
 }
 
 /**
@@ -318,4 +319,28 @@ bool http_client_test_connection(http_client_t *client, const char *test_url) {
     
     LV3_LOG_DEBUG("HTTP client test: %s -> %s", url, success ? "OK" : "FAILED");
     return success;
+}
+
+// New API wrappers for hyperliquid-c SDK
+
+http_client_t* http_client_create(void) {
+    http_client_t* client = NULL;
+    http_client_create(NULL, &client);
+    return client;
+}
+
+lv3_error_t http_client_get(http_client_t *client, const char *url, http_response_t *response) {
+    http_request_t req = {0};
+    strncpy(req.url, url, sizeof(req.url) - 1);
+    strncpy(req.method, "GET", sizeof(req.method) - 1);
+    return http_client_get(client, &req, response);
+}
+
+lv3_error_t http_client_post(http_client_t *client, const char *url, const char *body, const char *headers, http_response_t *response) {
+    http_request_t req = {0};
+    strncpy(req.url, url, sizeof(req.url) - 1);
+    strncpy(req.method, "POST", sizeof(req.method) - 1);
+    req.body = (char*)body;
+    req.headers = (char*)headers;
+    return http_client_post(client, &req, response);
 }

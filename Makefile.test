@@ -4,13 +4,19 @@ CC = gcc
 CFLAGS = -std=c11 -Wall -Wextra -O2
 INCLUDES = -Iinclude -I/opt/homebrew/include
 LDFLAGS = -L/opt/homebrew/lib
-LIBS = -lsecp256k1 -lmsgpackc -lm
+LIBS = -lsecp256k1 -lmsgpackc -lcurl -lcjson -lpthread -lm
 
 # Core modules (only what we need for test)
 CORE_OBJS = \
 	build/obj/crypto/keccak.o \
 	build/obj/crypto/eip712.o \
 	build/obj/msgpack/serialize.o
+
+# Full modules for integration test
+FULL_OBJS = $(CORE_OBJS) \
+	build/obj/http/simple_client.o \
+	build/obj/client.o \
+	build/obj/trading_api.o
 
 .PHONY: test_minimal
 test_minimal: $(CORE_OBJS)
@@ -22,6 +28,16 @@ test_minimal: $(CORE_OBJS)
 	@echo "Running test..."
 	@./build/bin/test_minimal
 
+.PHONY: test_integration
+test_integration: $(FULL_OBJS)
+	@echo "Building integration test..."
+	@mkdir -p build/bin
+	$(CC) $(CFLAGS) $(INCLUDES) tests/test_integration.c $(FULL_OBJS) -o build/bin/test_integration $(LDFLAGS) $(LIBS)
+	@echo "✅ Test built: build/bin/test_integration"
+	@echo ""
+	@echo "Running integration test..."
+	@./build/bin/test_integration
+
 build/obj/crypto/%.o: src/crypto/%.c
 	@mkdir -p build/obj/crypto
 	@echo "Compiling $<"
@@ -29,6 +45,16 @@ build/obj/crypto/%.o: src/crypto/%.c
 
 build/obj/msgpack/%.o: src/msgpack/%.c
 	@mkdir -p build/obj/msgpack
+	@echo "Compiling $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+build/obj/http/%.o: src/http/%.c
+	@mkdir -p build/obj/http
+	@echo "Compiling $<"
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+build/obj/%.o: src/%.c
+	@mkdir -p build/obj
 	@echo "Compiling $<"
 	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 

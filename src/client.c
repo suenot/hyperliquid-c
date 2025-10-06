@@ -7,6 +7,7 @@
 #include "hl_http.h"
 #include "hl_crypto_internal.h"
 #include "hl_msgpack.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -116,9 +117,12 @@ bool hl_test_connection(hl_client_t *client) {
     char url[256];
     snprintf(url, sizeof(url), "%s/info", base_url);
     
-    // Simple GET request to /info
+    // POST request to /info with minimal body
+    const char *body = "{\"type\":\"meta\"}";
+    const char *headers = "Content-Type: application/json";
+    
     http_response_t response = {0};
-    lv3_error_t result = http_client_get(client->http, url, &response);
+    lv3_error_t result = http_client_post(client->http, url, body, headers, &response);
     
     bool success = (result == LV3_SUCCESS && response.status_code == 200);
     
