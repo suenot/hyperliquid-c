@@ -1,0 +1,65 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Test artifacts
+tests/*.out
+coverage/
+coverage.info
+*.gcda
+*.gcno
+*.gcov
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+*.key
+secrets/
+
+# Documentation
+docs/html/
+docs/latex/
+docs/man/
+doxygen_sqlite3.db
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Credentials (IMPORTANT!)
+*.pem
+*.key
+*.priv
+wallet.json
+private_key.txt
+
