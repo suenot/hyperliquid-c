@@ -58,7 +58,12 @@ INTEGRATION_TESTS = test_connection \
                     test_fetch_ticker \
                     test_fetch_order_book \
                     test_fetch_ohlcv \
-                    test_integration_api
+                    test_integration_api \
+                    test_api_mock \
+                    test_order_management \
+                    test_margin_leverage \
+                    test_funding_rate \
+                    test_websocket_api
 
 .PHONY: all clean test test-unit test-integration test-priority help
 
@@ -110,13 +115,18 @@ test-report:
 	@echo "Phase 5 (Medium Pri):  0/18  (0%)   📌"
 	@echo "Phase 6 (Low Pri):     0/6   (0%)   📌"
 	@echo ""
-	@echo "Total: 9/51 (17.6%) - SIGNIFICANTLY IMPROVED! 🚀"
+	@echo "Total: 14/51 (27.5%) - EXCELLENT PROGRESS! 🚀"
 	@echo ""
-	@echo "🎯 NEW API INTEGRATION TESTS:"
+	@echo "🎯 COMPREHENSIVE API INTEGRATION TESTS:"
 	@echo "  ✅ test_fetch_balance (account data, balance structures)"
 	@echo "  ✅ test_fetch_markets (market data, symbol lookup)"
 	@echo "  ✅ test_fetch_positions (position data, PnL calculations)"
 	@echo "  ✅ test_integration_api (comprehensive API testing)"
+	@echo "  ✅ test_api_mock (mock API with real credentials)"
+	@echo "  ✅ test_order_management (order placement, cancellation, history)"
+	@echo "  ✅ test_margin_leverage (margin modes, leverage management)"
+	@echo "  ✅ test_funding_rate (funding rates, calculations, risk)"
+	@echo "  ✅ test_websocket_api (WebSocket connections, subscriptions)"
 	@echo ""
 	@echo "📊 Previous additions:"
 	@echo "  ✅ test_types (basic types and error codes)"
@@ -215,6 +225,52 @@ $(BIN_DIR)/test_integration_api: $(TEST_DIR)/test_integration_api.c $(TEST_DIR)/
 test_integration_api: $(BIN_DIR)/test_integration_api
 	@echo "Running test_integration_api..."
 	@$(BIN_DIR)/test_integration_api
+
+# New API integration tests
+$(BIN_DIR)/test_api_mock: $(TEST_DIR)/test_api_mock.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_api_mock: $(BIN_DIR)/test_api_mock
+	@echo "Running test_api_mock..."
+	@$(BIN_DIR)/test_api_mock
+
+$(BIN_DIR)/test_order_management: $(TEST_DIR)/test_order_management.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_order_management: $(BIN_DIR)/test_order_management
+	@echo "Running test_order_management..."
+	@$(BIN_DIR)/test_order_management
+
+$(BIN_DIR)/test_margin_leverage: $(TEST_DIR)/test_margin_leverage.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_margin_leverage: $(BIN_DIR)/test_margin_leverage
+	@echo "Running test_margin_leverage..."
+	@$(BIN_DIR)/test_margin_leverage
+
+$(BIN_DIR)/test_funding_rate: $(TEST_DIR)/test_funding_rate.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_funding_rate: $(BIN_DIR)/test_funding_rate
+	@echo "Running test_funding_rate..."
+	@$(BIN_DIR)/test_funding_rate
+
+$(BIN_DIR)/test_websocket_api: $(TEST_DIR)/test_websocket_api.c $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_websocket_api: $(BIN_DIR)/test_websocket_api
+	@echo "Running test_websocket_api..."
+	@$(BIN_DIR)/test_websocket_api
 
 # Integration tests - Connection
 $(BIN_DIR)/test_connection: $(TEST_DIR)/integration/01_connection/test_connection.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
@@ -341,7 +397,7 @@ test-unit: test_crypto_msgpack test_types test_account_types test_market_types
 	@echo ""
 	@echo "✅ All unit tests passed"
 
-test-integration: test_connection test_create_cancel_order
+test-integration: test_connection test_create_cancel_order test_api_mock test_order_management test_margin_leverage test_funding_rate test_websocket_api
 	@echo ""
 	@echo "✅ All integration tests passed"
 
@@ -357,11 +413,15 @@ test-account: test_fetch_balance test_fetch_positions
 	@echo ""
 	@echo "Account tests completed"
 
-test-trading: test_create_cancel_order test_trading_comprehensive
+test-trading: test_create_cancel_order test_trading_comprehensive test_order_management
 	@echo ""
 	@echo "Trading tests completed"
 
-test: test-unit test-integration
+test-advanced: test_margin_leverage test_funding_rate test_websocket_api
+	@echo ""
+	@echo "Advanced features tests completed"
+
+test: test-unit test-integration test-advanced
 	@echo ""
 	@echo "════════════════════════════════════════"
 	@echo "✅ ALL TESTS PASSED"
