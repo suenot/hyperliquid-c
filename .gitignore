@@ -1,19 +1,20 @@
 # Build artifacts
 build/
 *.o
+*.d
 *.a
 *.so
 *.dylib
 *.dll
-*.exe
 
-# Test artifacts
-tests/*.out
-coverage/
-coverage.info
-*.gcda
-*.gcno
-*.gcov
+# Test executables
+test_minimal
+test_integration
+test_*
+
+# Compiled executables
+hyperliquid-c
+listing-v3-c
 
 # Debug files
 *.dSYM/
@@ -21,7 +22,7 @@ coverage.info
 *.idb
 *.pdb
 
-# IDE files
+# Editor files
 .vscode/
 .idea/
 *.swp
@@ -29,37 +30,42 @@ coverage.info
 *~
 .DS_Store
 
-# Environment files
+# Environment
 .env
-*.key
-secrets/
-
-# Documentation
-docs/html/
-docs/latex/
-docs/man/
-doxygen_sqlite3.db
-
-# Temporary files
-*.tmp
-*.bak
 *.log
 
-# CMake
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
+# Coverage
+*.gcov
+*.gcda
+*.gcno
+coverage/
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
+# Dependencies
+deps/
+vendor/
 
-# Credentials (IMPORTANT!)
-*.pem
-*.key
-*.priv
-wallet.json
-private_key.txt
+# Generated files
+compile_commands.json
+.cache/
 
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

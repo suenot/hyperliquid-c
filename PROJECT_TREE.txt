@@ -1,0 +1,40 @@
+.
+├── ARCHITECTURE.md
+├── CONTRIBUTING.md
+├── CURRENT_STATUS.md
+├── LICENSE
+├── Makefile
+├── Makefile.test
+├── PHASE2_COMPLETE.md
+├── PROJECT_SUMMARY.md
+├── PROJECT_TREE.txt
+├── QUICKSTART.md
+├── README.md
+├── README_GITHUB.md
+├── STATUS.md
+├── check_ready.sh
+├── docs
+├── examples
+│   └── simple_trade.c
+├── fix_includes.sh
+├── include
+│   ├── hl_crypto_internal.h
+│   ├── hl_http.h
+│   ├── hl_internal.h
+│   ├── hl_logger.h
+│   ├── hl_msgpack.h
+│   └── hyperliquid.h
+├── src
+│   ├── client.c
+│   ├── crypto
+│   │   ├── eip712.c
+│   │   └── keccak.c
+│   ├── http
+│   │   └── client.c
+│   ├── msgpack
+│   │   └── serialize.c
+│   └── trading.c
+└── tests
+    └── test_minimal.c
+
+9 directories, 29 files
