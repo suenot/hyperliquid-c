@@ -38,6 +38,8 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 
+// hl_account.h included at end of file after base types defined
+
 /***************************************************************************
  * VERSION
  ***************************************************************************/
@@ -65,7 +67,11 @@ typedef enum {
     HL_ERROR_JSON = -10,         /**< JSON parsing error */
     HL_ERROR_MEMORY = -11,       /**< Memory allocation failed */
     HL_ERROR_TIMEOUT = -12,      /**< Operation timed out */
+    HL_ERROR_NOT_IMPLEMENTED = -13, /**< Feature not implemented */
+    HL_ERROR_NOT_FOUND = -14,    /**< Resource not found */
+    HL_ERROR_PARSE = -15         /**< Response parsing error */
 } hl_error_t;
+#define HL_ERROR_T_DEFINED
 
 /***************************************************************************
  * ENUMS
@@ -133,26 +139,7 @@ typedef struct {
     char error[256];             /**< Error message (if any) */
 } hl_cancel_result_t;
 
-/** Account balance */
-typedef struct {
-    double account_value;        /**< Total account value (USDC) */
-    double total_margin_used;    /**< Total margin used (USDC) */
-    double withdrawable;         /**< Withdrawable amount (USDC) */
-    double total_ntl_pos;        /**< Total notional position (USDC) */
-    double total_raw_usd;        /**< Total raw USD */
-} hl_balance_t;
-
-/** Position info */
-typedef struct {
-    char symbol[32];             /**< Symbol */
-    double size;                 /**< Position size (positive = long, negative = short) */
-    double entry_price;          /**< Average entry price */
-    double mark_price;           /**< Current mark price */
-    double liquidation_price;    /**< Liquidation price */
-    double unrealized_pnl;       /**< Unrealized PnL */
-    double margin_used;          /**< Margin used */
-    double leverage;             /**< Effective leverage */
-} hl_position_t;
+// Balance and Position types moved to hl_account.h
 
 /** Trade info */
 typedef struct {
@@ -309,33 +296,7 @@ int hl_modify_order(hl_client_t *client,
  * ACCOUNT INFORMATION
  ***************************************************************************/
 
-/**
- * @brief Get account balance
- * 
- * @param client Client handle
- * @param balance Balance info (output)
- * @return HL_SUCCESS on success, error code otherwise
- */
-int hl_get_balance(hl_client_t *client, hl_balance_t *balance);
-
-/**
- * @brief Get open positions
- * 
- * @param client Client handle
- * @param positions Array of positions (output, must be freed with hl_free_positions)
- * @param count Number of positions (output)
- * @return HL_SUCCESS on success, error code otherwise
- */
-int hl_get_positions(hl_client_t *client, 
-                     hl_position_t **positions, 
-                     size_t *count);
-
-/**
- * @brief Free positions array
- * 
- * @param positions Array allocated by hl_get_positions
- */
-void hl_free_positions(hl_position_t *positions);
+// Account and position functions moved to hl_account.h
 
 /**
  * @brief Get trade history
@@ -432,6 +393,13 @@ const char* hl_version(void);
  * @param enabled true to enable, false to disable
  */
 void hl_set_debug(bool enabled);
+
+/***************************************************************************
+ * EXTENDED MODULES
+ ***************************************************************************/
+
+// Include extended API modules after base types are defined
+#include "hl_account.h"
 
 #ifdef __cplusplus
 }

@@ -18,7 +18,8 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(wildcard $(SRC_DIR)/msgpack/*.c) \
             $(wildcard $(SRC_DIR)/http/*.c) \
             $(SRC_DIR)/client.c \
-            $(SRC_DIR)/trading_api.c
+            $(SRC_DIR)/trading_api.c \
+            $(SRC_DIR)/account.c
 
 TEST_HELPER_SRCS = $(TEST_DIR)/helpers/test_common.c
 
@@ -135,10 +136,15 @@ test_create_cancel_order: $(BIN_DIR)/test_create_cancel_order
 	@echo "Running test_create_cancel_order..."
 	@$(BIN_DIR)/test_create_cancel_order
 
-# Placeholder tests (to be implemented)
-test_fetch_balance:
-	@echo "❌ test_fetch_balance not yet implemented"
-	@echo "   Location: tests/integration/03_account/test_fetch_balance.c"
+# Account tests
+$(BIN_DIR)/test_fetch_balance: $(TEST_DIR)/integration/03_account/test_fetch_balance.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+test_fetch_balance: $(BIN_DIR)/test_fetch_balance
+	@echo "Running test_fetch_balance..."
+	@$(BIN_DIR)/test_fetch_balance
 
 test_fetch_positions:
 	@echo "❌ test_fetch_positions not yet implemented"
