@@ -220,6 +220,298 @@ hl_error_t hl_fetch_closed_orders(hl_client_t* client,
 }
 
 /**
+ * @brief Fetch canceled orders
+ */
+hl_error_t hl_fetch_canceled_orders(hl_client_t* client,
+                                   const char* symbol,
+                                   const char* since,
+                                   uint32_t limit,
+                                   hl_orders_t* orders) {
+    if (!client || !orders) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(orders, 0, sizeof(hl_orders_t));
+
+    // Prepare request - use historicalOrders endpoint
+    char request_body[1024];
+    const char* user_address = hl_client_get_wallet_address_old(client);
+
+    if (!user_address) {
+        return HL_ERROR_AUTH;
+    }
+
+    // Use historicalOrders method to get all order history
+    snprintf(request_body, sizeof(request_body),
+             "{\"type\":\"historicalOrders\",\"user\":\"%s\"}", user_address);
+
+    // Make request
+    http_response_t* response = NULL;
+    lv3_error_t err = http_client_post_old(client, "/info", request_body, NULL, &response);
+
+    if (err != LV3_SUCCESS || !response || response->status_code != 200) {
+        if (response) {
+            http_response_free(response);
+        }
+        return HL_ERROR_NETWORK;
+    }
+
+    // Parse JSON response
+    cJSON* json = cJSON_Parse(response->body);
+    if (!json) {
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    // Response is an array of orders
+    if (!cJSON_IsArray(json)) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    int array_size = cJSON_GetArraySize(json);
+    if (array_size == 0) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_SUCCESS; // No orders
+    }
+
+    // Allocate temporary array for all orders
+    hl_order_t* all_orders = calloc(array_size, sizeof(hl_order_t));
+    if (!all_orders) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_MEMORY;
+    }
+
+    // Parse all orders
+    size_t valid_orders = 0;
+    cJSON* order_json = NULL;
+    cJSON_ArrayForEach(order_json, json) {
+        if (valid_orders >= array_size) break;
+
+        hl_error_t parse_err = parse_order_from_json(order_json, &all_orders[valid_orders]);
+        if (parse_err == HL_SUCCESS) {
+            valid_orders++;
+        }
+    }
+
+    // Filter canceled orders (status == "canceled")
+    size_t canceled_count = 0;
+    for (size_t i = 0; i < valid_orders; i++) {
+        if (strcmp(all_orders[i].status, "canceled") == 0) {
+            canceled_count++;
+        }
+    }
+
+    // Allocate result array for canceled orders only
+    if (canceled_count > 0) {
+        orders->orders = calloc(canceled_count, sizeof(hl_order_t));
+        if (!orders->orders) {
+            free(all_orders);
+            cJSON_Delete(json);
+            http_response_free(response);
+            return HL_ERROR_MEMORY;
+        }
+
+        // Copy canceled orders
+        size_t result_idx = 0;
+        for (size_t i = 0; i < valid_orders; i++) {
+            if (strcmp(all_orders[i].status, "canceled") == 0) {
+                orders->orders[result_idx] = all_orders[i];
+                result_idx++;
+            }
+        }
+        orders->count = canceled_count;
+    }
+
+    free(all_orders);
+    cJSON_Delete(json);
+    http_response_free(response);
+
+    return HL_SUCCESS;
+}
+
+/**
+ * @brief Fetch canceled and closed orders
+ */
+hl_error_t hl_fetch_canceled_and_closed_orders(hl_client_t* client,
+                                              const char* symbol,
+                                              const char* since,
+                                              uint32_t limit,
+                                              hl_orders_t* orders) {
+    if (!client || !orders) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(orders, 0, sizeof(hl_orders_t));
+
+    // Prepare request - use historicalOrders endpoint
+    char request_body[1024];
+    const char* user_address = hl_client_get_wallet_address_old(client);
+
+    if (!user_address) {
+        return HL_ERROR_AUTH;
+    }
+
+    // Use historicalOrders method to get all order history
+    snprintf(request_body, sizeof(request_body),
+             "{\"type\":\"historicalOrders\",\"user\":\"%s\"}", user_address);
+
+    // Make request
+    http_response_t* response = NULL;
+    lv3_error_t err = http_client_post_old(client, "/info", request_body, NULL, &response);
+
+    if (err != LV3_SUCCESS || !response || response->status_code != 200) {
+        if (response) {
+            http_response_free(response);
+        }
+        return HL_ERROR_NETWORK;
+    }
+
+    // Parse JSON response
+    cJSON* json = cJSON_Parse(response->body);
+    if (!json) {
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    // Response is an array of orders
+    if (!cJSON_IsArray(json)) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_JSON;
+    }
+
+    int array_size = cJSON_GetArraySize(json);
+    if (array_size == 0) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_SUCCESS; // No orders
+    }
+
+    // Allocate temporary array for all orders
+    hl_order_t* all_orders = calloc(array_size, sizeof(hl_order_t));
+    if (!all_orders) {
+        cJSON_Delete(json);
+        http_response_free(response);
+        return HL_ERROR_MEMORY;
+    }
+
+    // Parse all orders
+    size_t valid_orders = 0;
+    cJSON* order_json = NULL;
+    cJSON_ArrayForEach(order_json, json) {
+        if (valid_orders >= array_size) break;
+
+        hl_error_t parse_err = parse_order_from_json(order_json, &all_orders[valid_orders]);
+        if (parse_err == HL_SUCCESS) {
+            valid_orders++;
+        }
+    }
+
+    // Filter canceled and closed orders (status != "open")
+    size_t filtered_count = 0;
+    for (size_t i = 0; i < valid_orders; i++) {
+        if (strcmp(all_orders[i].status, "open") != 0) {
+            filtered_count++;
+        }
+    }
+
+    // Allocate result array for filtered orders
+    if (filtered_count > 0) {
+        orders->orders = calloc(filtered_count, sizeof(hl_order_t));
+        if (!orders->orders) {
+            free(all_orders);
+            cJSON_Delete(json);
+            http_response_free(response);
+            return HL_ERROR_MEMORY;
+        }
+
+        // Copy filtered orders
+        size_t result_idx = 0;
+        for (size_t i = 0; i < valid_orders; i++) {
+            if (strcmp(all_orders[i].status, "open") != 0) {
+                orders->orders[result_idx] = all_orders[i];
+                result_idx++;
+            }
+        }
+        orders->count = filtered_count;
+    }
+
+    free(all_orders);
+    cJSON_Delete(json);
+    http_response_free(response);
+
+    return HL_SUCCESS;
+}
+
+/**
+ * @brief Fetch all orders (open, closed, canceled)
+ */
+hl_error_t hl_fetch_orders(hl_client_t* client,
+                          const char* symbol,
+                          const char* since,
+                          uint32_t limit,
+                          hl_orders_t* orders) {
+    if (!client || !orders) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(orders, 0, sizeof(hl_orders_t));
+
+    // For now, combine open orders and historical orders
+    // This is a simplified implementation - in production might need optimization
+
+    // First get open orders
+    hl_orders_t open_orders = {0};
+    hl_error_t open_err = hl_fetch_open_orders(client, symbol, since, limit, &open_orders);
+
+    // Then get historical orders
+    hl_orders_t historical_orders = {0};
+    hl_error_t hist_err = hl_fetch_canceled_and_closed_orders(client, symbol, since, limit, &historical_orders);
+
+    if (open_err != HL_SUCCESS && hist_err != HL_SUCCESS) {
+        return open_err; // Return first error
+    }
+
+    // Combine results
+    size_t total_count = open_orders.count + historical_orders.count;
+    if (total_count == 0) {
+        return HL_SUCCESS; // No orders
+    }
+
+    orders->orders = calloc(total_count, sizeof(hl_order_t));
+    if (!orders->orders) {
+        hl_free_orders(&open_orders);
+        hl_free_orders(&historical_orders);
+        return HL_ERROR_MEMORY;
+    }
+
+    // Copy open orders
+    for (size_t i = 0; i < open_orders.count; i++) {
+        orders->orders[i] = open_orders.orders[i];
+    }
+
+    // Copy historical orders
+    for (size_t i = 0; i < historical_orders.count; i++) {
+        orders->orders[open_orders.count + i] = historical_orders.orders[i];
+    }
+
+    orders->count = total_count;
+
+    // Free temporary arrays (but not individual orders since we copied them)
+    free(open_orders.orders);
+    free(historical_orders.orders);
+
+    return HL_SUCCESS;
+}
+
+/**
  * @brief Fetch specific order by ID
  */
 hl_error_t hl_fetch_order(hl_client_t* client,

@@ -398,7 +398,55 @@ static hl_error_t parse_position(cJSON* position_data, hl_position_t* position) 
 }
 
 /**
- * @brief Fetch all positions
+ * @brief Fetch single position by symbol
+ */
+hl_error_t hl_fetch_position(hl_client_t* client,
+                            const char* symbol,
+                            hl_position_t* position) {
+    if (!client || !symbol || !position) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Clear output
+    memset(position, 0, sizeof(hl_position_t));
+
+    // Get all positions first
+    hl_position_t* all_positions = NULL;
+    size_t count = 0;
+    hl_error_t err = hl_fetch_positions(client, &all_positions, &count);
+    if (err != HL_SUCCESS) {
+        return err;
+    }
+
+    // Extract coin name from symbol (e.g., "BTC/USDC:USDC" -> "BTC")
+    char coin[32] = {0};
+    const char* separator = strchr(symbol, '/');
+    if (separator) {
+        size_t coin_len = separator - symbol;
+        if (coin_len < sizeof(coin)) {
+            memcpy(coin, symbol, coin_len);
+        }
+    } else {
+        // Assume symbol is just the coin name
+        strncpy(coin, symbol, sizeof(coin) - 1);
+    }
+
+    // Find position by coin
+    for (size_t i = 0; i < count; i++) {
+        if (strcmp(all_positions[i].symbol, coin) == 0) {
+            *position = all_positions[i];
+            free(all_positions);
+            return HL_SUCCESS;
+        }
+    }
+
+    // Position not found
+    free(all_positions);
+    return HL_ERROR_NOT_FOUND;
+}
+
+/**
+ * @brief Fetch all positions (legacy function for backward compatibility)
  */
 hl_error_t hl_fetch_positions(hl_client_t* client, hl_position_t** positions, size_t* count) {
     if (!client || !positions || !count) {

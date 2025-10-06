@@ -31,7 +31,9 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(SRC_DIR)/market_extended.c \
             $(SRC_DIR)/leverage.c \
             $(SRC_DIR)/currencies.c \
-            $(SRC_DIR)/funding.c
+            $(SRC_DIR)/funding.c \
+            $(SRC_DIR)/ws_client.c \
+            $(SRC_DIR)/websocket.c
 
 TEST_HELPER_SRCS = $(TEST_DIR)/helpers/test_common.c
 
@@ -47,6 +49,7 @@ INTEGRATION_TESTS = test_connection \
                     test_ccxt_describe \
                     test_extended_api \
                     test_advanced_api \
+                    test_websocket \
                     test_fetch_balance \
                     test_fetch_positions \
                     test_fetch_markets \
@@ -187,6 +190,15 @@ $(BIN_DIR)/test_advanced_api: $(TEST_DIR)/integration/07_advanced_api/test_advan
 test_advanced_api: $(BIN_DIR)/test_advanced_api
 	@echo "Running test_advanced_api..."
 	@$(BIN_DIR)/test_advanced_api
+
+$(BIN_DIR)/test_websocket: $(TEST_DIR)/integration/08_websocket/test_websocket.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS) -luuid
+
+test_websocket: $(BIN_DIR)/test_websocket
+	@echo "Running test_websocket..."
+	@$(BIN_DIR)/test_websocket
 
 # Account tests
 $(BIN_DIR)/test_fetch_balance: $(TEST_DIR)/integration/03_account/test_fetch_balance.c $(CORE_OBJS) $(TEST_HELPER_OBJS)

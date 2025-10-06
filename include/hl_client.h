@@ -47,6 +47,9 @@ struct hl_client {
     hl_http_client_t* http_client;
     hl_ws_client_t* ws_client;
 
+    // WebSocket extensions
+    void* ws_extension;             /**< WebSocket subscription management */
+
     // State
     hl_markets_t* markets;          /**< cached markets */
     hl_balances_t* balances;        /**< cached balances */
