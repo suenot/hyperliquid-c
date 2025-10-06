@@ -604,6 +604,72 @@ hl_error_t hl_fetch_withdrawals(hl_client_t* client,
                                uint32_t limit,
                                void* withdrawals);
 
+/**
+ * @brief Create multiple orders
+ *
+ * @param client Client instance
+ * @param orders Array of order requests
+ * @param orders_count Number of orders in array
+ * @param results Output array for order results
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_create_orders(hl_client_t* client,
+                           const hl_order_request_t* orders,
+                           size_t orders_count,
+                           hl_order_result_t* results);
+
+/**
+ * @brief Cancel multiple orders
+ *
+ * @param client Client instance
+ * @param orders Array of order IDs to cancel
+ * @param orders_count Number of order IDs
+ * @param results Output array for cancellation results
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_cancel_orders(hl_client_t* client,
+                           const char** orders,
+                           size_t orders_count,
+                           hl_cancel_result_t* results);
+
+/**
+ * @brief Edit an existing order
+ *
+ * @param client Client instance
+ * @param order_id Order ID to edit
+ * @param request New order parameters
+ * @param result Output order result
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_edit_order(hl_client_t* client,
+                        const char* order_id,
+                        const hl_order_request_t* request,
+                        hl_order_result_t* result);
+
+/**
+ * @brief Add margin to a position
+ *
+ * @param client Client instance
+ * @param symbol Trading symbol
+ * @param amount Amount of margin to add
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_add_margin(hl_client_t* client,
+                        const char* symbol,
+                        double amount);
+
+/**
+ * @brief Reduce margin from a position
+ *
+ * @param client Client instance
+ * @param symbol Trading symbol
+ * @param amount Amount of margin to reduce
+ * @return HL_SUCCESS on success, error code otherwise
+ */
+hl_error_t hl_reduce_margin(hl_client_t* client,
+                           const char* symbol,
+                           double amount);
+
 /***************************************************************************
  * EXTENDED MODULES
  ***************************************************************************/

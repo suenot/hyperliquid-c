@@ -647,3 +647,81 @@ static hl_error_t parse_order_from_json(cJSON* order_json, hl_order_t* order) {
 
     return HL_SUCCESS;
 }
+
+/**
+ * @brief Create multiple orders
+ */
+hl_error_t hl_create_orders(hl_client_t* client,
+                           const hl_order_request_t* orders,
+                           size_t orders_count,
+                           hl_order_result_t* results) {
+    if (!client || !orders || !results || orders_count == 0) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    hl_error_t final_result = HL_SUCCESS;
+
+    // Create each order individually
+    for (size_t i = 0; i < orders_count; i++) {
+        hl_error_t err = hl_place_order(client, orders[i], &results[i]);
+
+        // If any order fails, we still continue with others but remember the error
+        if (err != HL_SUCCESS) {
+            final_result = err;
+        }
+    }
+
+    return final_result;
+}
+
+/**
+ * @brief Cancel multiple orders
+ */
+hl_error_t hl_cancel_orders(hl_client_t* client,
+                           const char** orders,
+                           size_t orders_count,
+                           hl_cancel_result_t* results) {
+    if (!client || !orders || !results || orders_count == 0) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    hl_error_t final_result = HL_SUCCESS;
+
+    // Cancel each order individually
+    for (size_t i = 0; i < orders_count; i++) {
+        hl_error_t err = hl_cancel_order(client, orders[i], &results[i]);
+
+        // If any cancellation fails, we still continue with others but remember the error
+        if (err != HL_SUCCESS) {
+            final_result = err;
+        }
+    }
+
+    return final_result;
+}
+
+/**
+ * @brief Edit an existing order
+ */
+hl_error_t hl_edit_order(hl_client_t* client,
+                        const char* order_id,
+                        const hl_order_request_t* request,
+                        hl_order_result_t* result) {
+    if (!client || !order_id || !request || !result) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // For simplicity, edit is implemented as cancel + create
+    // In production, this should use the actual edit endpoint if available
+
+    // First cancel the existing order
+    hl_cancel_result_t cancel_result;
+    hl_error_t cancel_err = hl_cancel_order(client, order_id, &cancel_result);
+
+    if (cancel_err != HL_SUCCESS) {
+        return cancel_err;
+    }
+
+    // Then create the new order
+    return hl_place_order(client, *request, result);
+}
