@@ -6,283 +6,99 @@
 - [client_new.c](file://src/client_new.c)
 - [hl_client.h](file://include/hl_client.h)
 - [hyperliquid.h](file://include/hyperliquid.h)
-- [simple_balance.c](file://examples/simple_balance.c)
-- [trading_bot.c](file://examples/trading_bot.c)
+- [hl_http.h](file://include/hl_http.h)
 </cite>
 
 ## Table of Contents
-1. [Introduction](#introduction)
-2. [Client Lifecycle Management](#client-lifecycle-management)
-3. [Configuration Options](#configuration-options)
-4. [Connection Testing and Health Checks](#connection-testing-and-health-checks)
-5. [State and Credential Management](#state-and-credential-management)
-6. [Thread Safety](#thread-safety)
-7. [Usage Examples](#usage-examples)
-8. [Common Issues](#common-issues)
-9. [Performance Considerations](#performance-considerations)
-10. [Client as Central Coordination Point](#client-as-central-coordination-point)
+1. [Client Creation and Configuration](#client-creation-and-configuration)
+2. [Resource Cleanup and Destruction](#resource-cleanup-and-destruction)
+3. [Connection Testing and Health Checks](#connection-testing-and-health-checks)
+4. [Testnet vs Mainnet Configuration](#testnet-vs-mainnet-configuration)
+5. [Error Handling During Initialization](#error-handling-during-initialization)
+6. [Opaque Pointer Pattern and ABI Stability](#opaque-pointer-pattern-and-abi-stability)
+7. [Thread-Safety Considerations](#thread-safety-considerations)
 
-## Introduction
-The `hl_client_t` structure serves as the central component for interacting with the Hyperliquid exchange API. This document provides comprehensive documentation on client management, covering the complete lifecycle from creation to destruction, configuration options, connection testing, and internal state management. The client acts as the primary interface for all trading operations, market data retrieval, and account information access.
+## Client Creation and Configuration
 
-**Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L220-L222)
-- [hl_client.h](file://include/hl_client.h#L13-L13)
+The Hyperliquid C SDK provides a robust client creation mechanism through the `hl_client_create()` function, which initializes a client instance with essential configuration parameters for API interaction. This function requires three parameters: a wallet address, a private key, and a boolean flag indicating testnet usage. The wallet address must be a valid Ethereum address in hexadecimal format starting with "0x", and the private key must be either 64 or 66 characters long (with or without the "0x" prefix). The function performs validation on these inputs and returns NULL if validation fails.
 
-## Client Lifecycle Management
+The client creation process allocates memory for the `hl_client_t` structure and initializes several critical components. By default, the HTTP request timeout is set to 30,000 milliseconds (30 seconds), providing a reasonable window for network operations. The client automatically configures the appropriate API endpoint based on the testnet parameter: "https://api.hyperliquid-testnet.xyz" for testnet operations and "https://api.hyperliquid.xyz" for mainnet operations. This endpoint selection is handled internally, ensuring that users don't need to manually specify URLs.
 
-### Creation with hl_client_create()
-The `hl_client_create()` function initializes a new client instance with the provided wallet address, private key, and network selection. The function performs validation on the input parameters, ensuring the wallet address follows the Ethereum format (0x prefix followed by 40 hexadecimal characters) and the private key is either 64 or 66 characters long (with or without the 0x prefix).
-
-Upon successful validation, the function allocates memory for the client structure, copies the credentials (stripping the 0x prefix if present), sets default configuration values, initializes a mutex for thread safety, and creates an HTTP client for API communication. The client is configured for 30-second timeout by default and debug mode is disabled.
-
-```mermaid
-flowchart TD
-Start([hl_client_create]) --> ValidateInput["Validate wallet address and private key"]
-ValidateInput --> InputValid{"Input Valid?"}
-InputValid --> |No| ReturnNull["Return NULL"]
-InputValid --> |Yes| AllocateMemory["Allocate hl_client_t structure"]
-AllocateMemory --> CopyCredentials["Copy and sanitize credentials"]
-CopyCredentials --> SetDefaults["Set default values: testnet, timeout, debug"]
-SetDefaults --> InitMutex["Initialize pthread mutex"]
-InitMutex --> CreateHTTP["Create HTTP client"]
-CreateHTTP --> HTTPSuccess{"HTTP client created?"}
-HTTPSuccess --> |No| Cleanup["Destroy mutex, free client, return NULL"]
-HTTPSuccess --> |Yes| ReturnClient["Return client pointer"]
-ReturnNull --> End([Function Exit])
-ReturnClient --> End
-```
-
-**Diagram sources**
-- [client.c](file://src/client.c#L34-L87)
-- [client_new.c](file://src/client_new.c#L230-L232)
+The client structure includes fields for storing the wallet address and private key (with the "0x" prefix automatically stripped if present), the testnet flag, timeout configuration, and debugging status. Additionally, a mutex is initialized during client creation to ensure thread safety for subsequent operations. The HTTP client component is also created during this process, establishing the foundation for all API communications. This comprehensive initialization ensures that the client is fully configured and ready for immediate use upon successful creation.
 
 **Section sources**
 - [client.c](file://src/client.c#L34-L87)
-- [client_new.c](file://src/client_new.c#L18-L68)
+- [hyperliquid.h](file://include/hyperliquid.h#L154-L156)
 
-### Destruction with hl_client_destroy()
-The `hl_client_destroy()` function properly cleans up all resources associated with a client instance. It first checks if the client pointer is valid, then destroys the HTTP client, securely zeros out the private key in memory before freeing it, destroys the mutex, and finally frees the client structure itself. This secure cleanup process prevents sensitive information from remaining in memory after the client is destroyed.
+## Resource Cleanup and Destruction
 
-```mermaid
-flowchart TD
-Start([hl_client_destroy]) --> CheckNull["Check if client is NULL"]
-CheckNull --> IsNull{"Client is NULL?"}
-IsNull --> |Yes| End([Function Exit])
-IsNull --> |No| DestroyHTTP["Destroy HTTP client if exists"]
-DestroyHTTP --> ZeroPrivateKey["Zero out private key in memory"]
-ZeroPrivateKey --> DestroyMutex["Destroy pthread mutex"]
-DestroyMutex --> FreeClient["Free client structure"]
-FreeClient --> End
-```
+Proper resource cleanup is essential for maintaining application stability and preventing memory leaks when using the Hyperliquid C SDK. The `hl_client_destroy()` function provides a comprehensive cleanup mechanism that systematically releases all resources allocated during client creation. This function accepts a pointer to the client instance and safely handles NULL inputs, making it safe to call even if client creation failed.
 
-**Diagram sources**
-- [client.c](file://src/client.c#L89-L107)
-- [client_new.c](file://src/client_new.c#L234-L236)
+The destruction process follows a specific sequence to ensure proper cleanup. First, the HTTP client component is destroyed, terminating any active connections and freeing associated network resources. Next, the private key stored in memory is securely zeroed out before the client structure is freed, providing an additional layer of security by preventing sensitive information from remaining in memory after the client is destroyed. The mutex initialized during client creation is then properly destroyed to release any system resources it may be holding.
+
+Finally, the memory allocated for the client structure itself is freed using the standard `free()` function. This complete cleanup process ensures that no resources are left dangling after the client is destroyed. It's important to note that after calling `hl_client_destroy()`, the client pointer becomes invalid and should not be used for any subsequent operations. The function is designed to be idempotent with respect to NULL pointers, allowing for safe error handling in initialization code paths.
 
 **Section sources**
 - [client.c](file://src/client.c#L89-L107)
-- [client_new.c](file://src/client_new.c#L70-L106)
-
-## Configuration Options
-
-### Network Selection (Testnet vs Mainnet)
-The client supports both testnet and mainnet environments through the `testnet` boolean parameter in `hl_client_create()`. When `testnet` is set to `true`, the client connects to the Hyperliquid testnet API endpoint, allowing for safe testing of trading strategies without risking real funds. When set to `false`, the client connects to the production mainnet environment.
-
-The network selection affects the base URL used for API requests:
-- Testnet: `https://api.hyperliquid-testnet.xyz`
-- Mainnet: `https://api.hyperliquid.xyz`
-
-Clients can check their current network configuration using the `hl_client_is_testnet()` function, which returns a boolean indicating whether the client is configured for testnet.
-
-**Section sources**
-- [client.c](file://src/client.c#L34-L87)
-- [client_new.c](file://src/client_new.c#L108-L110)
-
-### Logging Level Configuration
-The client library provides a global debug mode that can be enabled or disabled using the `hl_set_debug()` function. When debug mode is enabled, the library may output additional diagnostic information to aid in troubleshooting. However, this function is currently marked as a TODO in the implementation, indicating that the debug logging functionality is not yet fully implemented.
-
-For production use, debug mode should remain disabled to prevent potential exposure of sensitive information and to minimize performance overhead.
-
-**Section sources**
-- [client.c](file://src/client.c#L148-L152)
-
-### Timeout Settings
-The client allows configuration of HTTP request timeouts through the `hl_set_timeout()` function. By default, the client is configured with a 30-second timeout (30000 milliseconds). This timeout applies to all HTTP requests made through the client and helps prevent operations from hanging indefinitely in case of network issues.
-
-The timeout can be adjusted based on network conditions and application requirements. For applications running in environments with high network latency, a longer timeout may be necessary. For high-frequency trading applications, a shorter timeout might be preferred to quickly fail and retry requests.
-
-```mermaid
-classDiagram
-class hl_client_t {
-+char wallet_address[43]
-+char private_key[65]
-+bool testnet
-+http_client_t* http
-+uint32_t timeout_ms
-+pthread_mutex_t mutex
-+bool debug
-}
-class hl_options_t {
-+bool testnet
-+int timeout
-+int rate_limit
-+bool enable_cache
-+char user_agent[256]
-}
-hl_client_t --> hl_options_t : "contains"
-```
-
-**Diagram sources**
-- [client.c](file://src/client.c#L34-L87)
-- [hl_client.h](file://include/hl_client.h#L45-L53)
-
-**Section sources**
-- [client.c](file://src/client.c#L142-L146)
-- [client_new.c](file://src/client_new.c#L18-L68)
+- [hyperliquid.h](file://include/hyperliquid.h#L163-L163)
 
 ## Connection Testing and Health Checks
-The client provides the `hl_test_connection()` function to verify connectivity with the Hyperliquid API. This function sends a POST request to the `/info` endpoint with a minimal JSON body containing `{"type":"meta"}`. The function returns `true` if the request is successful and returns a 200 status code, indicating that the client can successfully communicate with the exchange API.
 
-The connection test automatically uses the appropriate base URL based on the client's testnet configuration and is protected by the client's mutex to ensure thread safety during the operation.
+The Hyperliquid C SDK includes a built-in connection testing mechanism through the `hl_test_connection()` function, which allows applications to verify connectivity to the Hyperliquid API before executing critical operations. This function performs a lightweight HTTP GET request to the `/info` endpoint of the Hyperliquid API, which returns basic exchange information without requiring authentication. The function returns a boolean value indicating whether the connection test was successful.
+
+The connection test is implemented with proper thread safety in mind, using the client's mutex to ensure that the test operation is atomic and doesn't interfere with other concurrent operations on the same client instance. The test constructs the appropriate URL based on the client's testnet configuration, ensuring that the connection check is performed against the correct environment (testnet or mainnet). A successful connection test requires both a successful HTTP request and a 200 OK status code from the server.
+
+This health check functionality is particularly valuable in production environments where network conditions may vary, or when implementing retry logic for transient network failures. Applications can use this function to implement connection resilience strategies, such as retrying failed connections or alerting users to network issues before attempting trading operations that require authentication and may have financial implications. The lightweight nature of this check makes it suitable for frequent polling if needed for monitoring purposes.
 
 **Section sources**
 - [client.c](file://src/client.c#L109-L140)
-- [client_new.c](file://src/client_new.c#L147-L152)
+- [hyperliquid.h](file://include/hyperliquid.h#L171-L171)
 
-## State and Credential Management
-The client maintains several pieces of internal state to facilitate efficient operation and secure credential handling. Credentials (wallet address and private key) are stored securely within the client structure and are never exposed directly through the public API. The private key is zeroed out in memory during client destruction to prevent potential exposure.
+## Testnet vs Mainnet Configuration
 
-The client also maintains a cache of market data when using the CCXT-compatible implementation, storing market information in the `markets` field of the `hl_client_t` structure. This caching mechanism reduces the need for repeated API calls to fetch market information, improving performance for applications that frequently access market data.
+The Hyperliquid C SDK provides straightforward configuration for operating in either testnet or mainnet environments through a single boolean parameter in the `hl_client_create()` function. When the `testnet` parameter is set to `true`, the client automatically configures itself to communicate with the Hyperliquid testnet environment, using the base URL "https://api.hyperliquid-testnet.xyz". When set to `false`, the client uses the production mainnet URL "https://api.hyperliquid.xyz".
 
-Additionally, the client manages HTTP connection state through the embedded `http_client_t` structure, maintaining persistent connections where possible to reduce connection overhead for subsequent requests.
+This configuration affects all subsequent API operations performed through the client instance, ensuring that trading, market data retrieval, and account operations are directed to the appropriate environment. The testnet environment is designed for development, testing, and integration purposes, allowing developers to experiment with the API without risking real funds. In contrast, the mainnet environment handles real trading with actual financial assets.
 
-**Section sources**
-- [client.c](file://src/client.c#L34-L87)
-- [client_new.c](file://src/client_new.c#L18-L68)
-
-## Thread Safety
-The client implementation includes built-in thread safety through the use of a pthread mutex. The mutex is initialized during client creation and protects access to shared resources, particularly during HTTP requests and connection testing. This allows the client to be safely used from multiple threads without external synchronization.
-
-Each public function that accesses shared state acquires the mutex at the beginning of its execution and releases it before returning, ensuring that operations are atomic from the perspective of other threads. This design enables concurrent use of the client for different operations, such as fetching market data on one thread while placing orders on another.
+The client maintains the testnet configuration throughout its lifecycle, and this setting cannot be changed after client creation. This design ensures that operations remain consistent within a single client instance and prevents accidental cross-environment operations. Developers should create separate client instances when they need to interact with both testnet and mainnet environments simultaneously. The clear separation between environments helps prevent common development mistakes, such as accidentally placing real trades while intending to test functionality.
 
 **Section sources**
 - [client.c](file://src/client.c#L34-L87)
-- [client.c](file://src/client.c#L193-L195)
+- [client.c](file://src/client.c#L109-L140)
 
-## Usage Examples
+## Error Handling During Initialization
 
-### Simple Balance Example
-The `simple_balance.c` example demonstrates basic client usage for fetching account balance information. It creates a client with testnet credentials, fetches both perpetual and spot account balances, displays the balance information, and properly destroys the client.
+The client initialization process in the Hyperliquid C SDK incorporates comprehensive error handling to ensure robust operation and provide meaningful feedback when issues occur. The `hl_client_create()` function employs multiple validation checks and returns NULL to indicate failure, allowing callers to handle initialization errors appropriately. The function validates both the wallet address and private key parameters, checking for NULL pointers, proper format (wallet address starting with "0x"), minimum length requirements, and valid private key length (64 or 66 characters).
 
-```mermaid
-sequenceDiagram
-participant Main as "main()"
-participant Client as "hl_client_create()"
-participant Balance as "hl_fetch_balance()"
-participant Destroy as "hl_client_destroy()"
-Main->>Client : Create client with wallet, key, testnet=true
-Client-->>Main : Return client pointer
-Main->>Balance : Fetch perpetual balance
-Balance-->>Main : Return balance data
-Main->>Balance : Fetch spot balance
-Balance-->>Main : Return balance data
-Main->>Destroy : Destroy client
-Destroy-->>Main : Complete cleanup
-```
+When validation fails, the function immediately returns NULL without allocating any resources, preventing memory leaks in error conditions. If validation passes but memory allocation fails during client structure creation, the function also returns NULL. Similarly, if the mutex initialization fails, the allocated client structure is freed, and NULL is returned. This systematic approach to error handling ensures that the function is exception-safe and that no resources are leaked when initialization fails.
 
-**Diagram sources**
-- [simple_balance.c](file://examples/simple_balance.c#L18-L86)
+Applications should always check the return value of `hl_client_create()` before using the client instance. A common pattern is to use the initialization within a conditional statement and provide appropriate error messaging or fallback behavior when client creation fails. This defensive programming approach helps create more resilient applications that can gracefully handle configuration errors, network issues, or system resource constraints during startup.
 
 **Section sources**
-- [simple_balance.c](file://examples/simple_balance.c#L18-L86)
+- [client.c](file://src/client.c#L34-L87)
+- [hyperliquid.h](file://include/hyperliquid.h#L154-L156)
 
-### Trading Bot Example
-The `trading_bot.c` example demonstrates a more complex usage pattern, including connection testing, balance monitoring, market data fetching, order placement, and WebSocket integration. The example shows how the client serves as the central coordination point for various trading operations and how different components interact through the client instance.
+## Opaque Pointer Pattern and ABI Stability
 
-**Section sources**
-- [trading_bot.c](file://examples/trading_bot.c#L22-L22)
+The Hyperliquid C SDK employs the opaque pointer pattern in its API design, which is evident in the declaration of the `hl_client_t` type as a forward-declared struct in the public headers. This design approach hides the internal implementation details of the client structure from users of the library, exposing only a pointer to the structure through the public API. The actual structure definition is contained within the implementation files, preventing direct access to its fields.
 
-## Common Issues
+This pattern provides significant benefits for ABI (Application Binary Interface) stability, allowing the library maintainers to modify the internal structure of the client without breaking compatibility with existing compiled applications. As long as the public API functions continue to accept and return `hl_client_t*` pointers and maintain their signatures, changes to the internal fields, their order, or additional functionality can be implemented without requiring recompilation of client code.
 
-### Connection Timeouts
-Connection timeouts can occur due to network issues, high API load, or firewall restrictions. To mitigate this, applications should:
-1. Implement retry logic with exponential backoff
-2. Adjust the timeout setting based on network conditions
-3. Monitor connection health using `hl_test_connection()`
-4. Handle timeout errors gracefully and provide appropriate user feedback
-
-### Authentication Failures
-Authentication failures typically result from invalid wallet addresses or private keys. To prevent these issues:
-1. Validate credentials before client creation
-2. Ensure private keys do not contain the 0x prefix (it will be stripped automatically)
-3. Verify wallet address format (0x followed by 40 hex characters)
-4. Handle authentication errors by prompting for credential verification
-
-### Resource Leaks
-Resource leaks can occur if `hl_client_destroy()` is not called after `hl_client_create()`. To prevent leaks:
-1. Always pair client creation with destruction
-2. Use RAII patterns or try-finally constructs where possible
-3. Implement proper error handling that includes cleanup
-4. Consider using static analysis tools to detect potential leaks
+The opaque pointer pattern also enforces encapsulation, ensuring that all interactions with the client occur through well-defined API functions rather than direct field manipulation. This allows the library to maintain invariants, perform validation, and manage resources properly. For example, when the private key is stored in the client structure, the library can ensure it's properly secured and zeroed out during cleanup, which would be difficult to guarantee if users could directly access the structure fields.
 
 **Section sources**
-- [client.c](file://src/client.c#L34-L107)
-- [client_new.c](file://src/client_new.c#L18-L106)
+- [hl_client.h](file://include/hl_client.h#L14-L14)
+- [client.c](file://src/client.c#L14-L42)
 
-## Performance Considerations
+## Thread-Safety Considerations
 
-### Long-Running Client Instances
-For applications that maintain long-running client instances, consider the following:
-1. Reuse client instances rather than creating and destroying them frequently
-2. Monitor connection health and recreate clients if connectivity is lost
-3. Implement connection pooling for applications with multiple concurrent operations
-4. Periodically refresh market data caches to ensure accuracy
+The Hyperliquid C SDK incorporates thread-safety features to support concurrent access to client instances from multiple threads. The primary mechanism for ensuring thread safety is the inclusion of a pthread mutex within the client structure, which is initialized during client creation and destroyed during cleanup. This mutex is used to protect critical sections of code that access shared client state, preventing race conditions when multiple threads attempt to use the same client instance simultaneously.
 
-### Connection Pooling Strategies
-While the current implementation does not include built-in connection pooling, applications can implement pooling strategies by:
-1. Maintaining a pool of pre-created client instances
-2. Using a single client with multiple worker threads (leveraging the built-in thread safety)
-3. Implementing a connection factory that manages client lifecycle
-4. Monitoring pool utilization and adjusting pool size based on load
+The connection test function (`hl_test_connection()`) demonstrates the use of this mutex by explicitly locking and unlocking it around the HTTP request operation, ensuring that the test is performed atomically. This design allows multiple threads to safely call client functions without external synchronization, as the library handles the necessary locking internally. However, developers should still consider the performance implications of contention when multiple threads frequently access the same client instance.
+
+While the client provides internal synchronization for its own operations, applications should be aware that excessive concurrent usage of a single client instance may lead to performance bottlenecks due to mutex contention. In high-concurrency scenarios, it may be more efficient to use multiple client instances or implement additional application-level queuing mechanisms. The thread-safety features ensure correctness but do not eliminate the need for thoughtful concurrency design in performance-critical applications.
 
 **Section sources**
-- [client.c](file://src/client.c#L34-L107)
-- [client_new.c](file://src/client_new.c#L18-L106)
-
-## Client as Central Coordination Point
-The `hl_client_t` instance serves as the central coordination point for all interactions with the Hyperliquid exchange. It provides the foundation for:
-1. **Authentication**: Securely storing and using credentials for signed API requests
-2. **Network Communication**: Managing HTTP connections and request/response cycles
-3. **State Management**: Caching market data and maintaining connection state
-4. **Error Handling**: Centralizing error reporting and recovery mechanisms
-5. **Feature Integration**: Coordinating between different modules (trading, market data, account management)
-
-All other modules in the SDK, including trading operations, market data retrieval, and account information access, depend on the client instance to perform their functions. This centralized design simplifies the API surface while providing a consistent interface for all exchange interactions.
-
-```mermaid
-graph TB
-Client[hl_client_t] --> Trading[Trading Operations]
-Client --> MarketData[Market Data]
-Client --> Account[Account Management]
-Client --> WebSocket[WebSocket Streaming]
-Client --> Utilities[Utility Functions]
-Trading --> PlaceOrder[hl_place_order]
-Trading --> CancelOrder[hl_cancel_order]
-MarketData --> GetTicker[hl_get_ticker]
-MarketData --> GetOrderbook[hl_get_orderbook]
-Account --> FetchBalance[hl_fetch_balance]
-Account --> FetchPositions[hl_fetch_positions]
-WebSocket --> WatchTicker[hl_watch_ticker]
-WebSocket --> WatchOrders[hl_watch_orders]
-Utilities --> TestConnection[hl_test_connection]
-Utilities --> SetTimeout[hl_set_timeout]
-```
-
-**Diagram sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L220-L229)
-- [hl_client.h](file://include/hl_client.h#L74-L80)
-
-**Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L220-L229)
-- [hl_client.h](file://include/hl_client.h#L74-L80)
+- [client.c](file://src/client.c#L34-L87)
+- [client.c](file://src/client.c#L89-L107)
+- [client.c](file://src/client.c#L109-L140)

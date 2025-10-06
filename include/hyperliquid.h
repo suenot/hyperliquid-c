@@ -15,7 +15,7 @@
  * Example:
  * ```c
  * hl_client_t *client = hl_client_create("0xAddress", "privkey", true);
- * hl_order_request_t order = {
+ * hl_order_request_api_t order = {
  *     .symbol = "BTC",
  *     .side = HL_SIDE_BUY,
  *     .price = 95000.0,
@@ -105,7 +105,7 @@ typedef enum {
 /** Opaque client handle */
 typedef struct hl_client hl_client_t;
 
-/** Order request */
+/** Order request (public API) */
 typedef struct {
     const char *symbol;          /**< Trading symbol (e.g., "BTC", "ETH") */
     hl_side_t side;              /**< Buy or sell */
@@ -115,7 +115,7 @@ typedef struct {
     hl_time_in_force_t time_in_force; /**< Time in force */
     bool reduce_only;            /**< Reduce-only order */
     uint32_t slippage_bps;       /**< Slippage in basis points (market orders) */
-} hl_order_request_t;
+} hl_order_request_api_t;
 
 /** Order result */
 typedef struct {
@@ -193,7 +193,7 @@ void hl_set_timeout(hl_client_t *client, uint32_t timeout_ms);
  * 
  * Example:
  * ```c
- * hl_order_request_t request = {
+ * hl_order_request_api_t request = {
  *     .symbol = "BTC",
  *     .side = HL_SIDE_BUY,
  *     .price = 95000.0,
@@ -209,7 +209,7 @@ void hl_set_timeout(hl_client_t *client, uint32_t timeout_ms);
  * ```
  */
 hl_error_t hl_place_order(hl_client_t *client, 
-                          const hl_order_request_t *request,
+                          const hl_order_request_api_t *request,
                           hl_order_result_t *result);
 
 /**
@@ -246,7 +246,7 @@ int hl_cancel_all_orders(hl_client_t *client, const char *symbol);
  */
 int hl_modify_order(hl_client_t *client,
                     uint64_t order_id,
-                    const hl_order_request_t *new_order,
+                    const hl_order_request_api_t *new_order,
                     hl_order_result_t *result);
 
 /***************************************************************************
@@ -543,7 +543,7 @@ hl_error_t hl_fetch_withdrawals(hl_client_t* client,
  * @return HL_SUCCESS on success, error code otherwise
  */
 hl_error_t hl_create_orders(hl_client_t* client,
-                           const hl_order_request_t* orders,
+                           const hl_order_request_api_t* orders,
                            size_t orders_count,
                            hl_order_result_t* results);
 
@@ -572,7 +572,7 @@ hl_error_t hl_cancel_orders(hl_client_t* client,
  */
 hl_error_t hl_edit_order(hl_client_t* client,
                         const char* order_id,
-                        const hl_order_request_t* request,
+                        const hl_order_request_api_t* request,
                         hl_order_result_t* result);
 
 /**

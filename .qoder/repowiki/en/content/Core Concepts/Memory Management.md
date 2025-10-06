@@ -2,47 +2,64 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [client.c](file://src/client.c)
-- [types.c](file://src/types.c)
-- [orderbook.c](file://src/orderbook.c)
-- [hyperliquid.h](file://include/hyperliquid.h)
-- [hl_types.h](file://include/hl_types.h)
 - [hl_client.h](file://include/hl_client.h)
+- [client.c](file://src/client.c)
+- [client_new.c](file://src/client_new.c)
+- [hyperliquid.h](file://include/hyperliquid.h)
+- [hl_markets.h](file://include/hl_markets.h)
+- [hl_orderbook.h](file://include/hl_orderbook.h)
+- [hl_ticker.h](file://include/hl_ticker.h)
+- [hl_account.h](file://include/hl_account.h)
+- [hl_types.h](file://include/hl_types.h)
+- [types.c](file://src/types.c)
 </cite>
 
 ## Table of Contents
 1. [Introduction](#introduction)
-2. [RAII-like Resource Management](#raii-like-resource-management)
-3. [Internal Allocation Functions](#internal-allocation-functions)
-4. [Zero-Copy Design Philosophy](#zero-copy-design-philosophy)
-5. [Memory Management for API Responses](#memory-management-for-api-responses)
-6. [Order Book Memory Handling](#order-book-memory-handling)
-7. [Thread Safety and Cleanup Handlers](#thread-safety-and-cleanup-handlers)
-8. [Common Memory Issues](#common-memory-issues)
-9. [Debugging Strategies](#debugging-strategies)
-10. [Best Practices](#best-practices)
+2. [Core Memory Ownership Model](#core-memory-ownership-model)
+3. [Client Lifecycle Management](#client-lifecycle-management)
+4. [Data Structure Memory Allocation](#data-structure-memory-allocation)
+5. [Function-Specific Memory Behavior](#function-specific-memory-behavior)
+6. [Memory Cleanup and Deallocation](#memory-cleanup-and-deallocation)
+7. [Common Memory Management Pitfalls](#common-memory-management-pitfalls)
+8. [Stack vs Heap Allocation Strategy](#stack-vs-heap-allocation-strategy)
+9. [Custom Memory Allocator Integration](#custom-memory-allocator-integration)
+10. [Memory Issue Detection and Debugging](#memory-issue-detection-and-debugging)
 
 ## Introduction
-The hyperliquid-c library implements a comprehensive memory management system designed for reliability, efficiency, and safety in financial trading applications. This document details the memory management practices employed throughout the codebase, focusing on the RAII-like pattern for resource acquisition and release, internal allocation functions, zero-copy design principles, and strategies for preventing common memory issues. The library emphasizes deterministic resource cleanup through explicit destroy functions and careful handling of dynamic data structures.
+This document provides comprehensive guidance on memory management responsibilities between the hyperliquid-c library and its users. It details the ownership model for key data structures, clarifies allocation and deallocation responsibilities, and provides best practices for resource management. The hyperliquid-c library follows a clear ownership model where most complex data structures are allocated by the library and must be explicitly freed by the caller using provided deallocation functions. Simple structures use caller-provided buffers with stack allocation, while dynamic collections require heap allocation and explicit cleanup.
 
-## RAII-like Resource Management
-The hyperliquid-c library employs an RAII-like pattern for resource management, where resource acquisition occurs during object creation and release happens through explicit destroy functions. This approach ensures that all allocated resources are properly cleaned up, preventing memory leaks and resource exhaustion.
+**Section sources**
+- [hyperliquid.h](file://include/hyperliquid.h#L1-L617)
 
-The primary example of this pattern is the client lifecycle management. When a client is created using `hl_client_new`, various resources are allocated including the client structure itself, HTTP client, configuration data, and internal state. The corresponding `hl_client_destroy` function is responsible for releasing all these resources in a proper sequence.
+## Core Memory Ownership Model
+The hyperliquid-c library implements a hybrid memory ownership model that combines explicit ownership transfer with caller-provided buffer patterns. The library maintains ownership of internal state and client resources, while transferring ownership of dynamically allocated response data to the caller. For data retrieval functions, the library follows two primary patterns: output parameter filling for fixed-size structures and ownership transfer for dynamically sized collections.
+
+The `hl_client_t` structure represents the primary ownership boundary, with the caller responsible for its lifecycle through `hl_client_create`/`hl_client_destroy`. Internal components like HTTP clients and mutexes are owned by the client and automatically cleaned up. For response data, functions that return variable-length data (markets, orders, trades) allocate memory that becomes the caller's responsibility to free using corresponding free functions.
+
+**Section sources**
+- [hl_client.h](file://include/hl_client.h#L1-L189)
+- [hyperliquid.h](file://include/hyperliquid.h#L1-L617)
+
+## Client Lifecycle Management
+Client lifecycle is managed through explicit creation and destruction functions. The `hl_client_create` function allocates and initializes the `hl_client_t` structure along with its internal components, including HTTP client handles, mutexes, and authentication data. The caller assumes ownership of the returned client pointer and must eventually call `hl_client_destroy` to release all associated resources.
+
+The destruction process follows a specific cleanup sequence: first destroying dependent components (HTTP client), then securely zeroing sensitive data (private key), destroying synchronization primitives (mutex), and finally freeing the client structure itself. This ensures proper resource cleanup and prevents information leakage.
 
 ```mermaid
 flowchart TD
-Start([Client Creation]) --> Allocate["Allocate client structure"]
-Allocate --> InitConfig["Initialize configuration"]
-InitConfig --> CreateHTTP["Create HTTP client"]
-CreateHTTP --> ReturnClient["Return client handle"]
-Destroy([Client Destruction]) --> CheckNull{"Client NULL?"}
-CheckNull --> |Yes| End1([Exit])
-CheckNull --> |No| DestroyHTTP["Destroy HTTP client"]
-DestroyHTTP --> ZeroKey["Zero out private key"]
+Start([Client Creation]) --> Allocate["Allocate hl_client_t structure"]
+Allocate --> InitAuth["Initialize authentication data"]
+InitAuth --> InitMutex["Initialize mutex"]
+InitMutex --> CreateHTTP["Create HTTP client"]
+CreateHTTP --> ReturnClient["Return client to caller"]
+ReturnClient --> Usage["Client in use"]
+Usage --> Destroy["hl_client_destroy called"]
+Destroy --> DestroyHTTP["Destroy HTTP client"]
+DestroyHTTP --> ZeroKey["Zero private key memory"]
 ZeroKey --> DestroyMutex["Destroy mutex"]
 DestroyMutex --> FreeClient["Free client structure"]
-FreeClient --> End2([Exit])
+FreeClient --> End([Cleanup Complete])
 ```
 
 **Diagram sources**
@@ -50,255 +67,199 @@ FreeClient --> End2([Exit])
 - [client_new.c](file://src/client_new.c#L234-L236)
 
 **Section sources**
-- [client.c](file://src/client.c#L89-L107)
-- [client_new.c](file://src/client_new.c#L234-L236)
-- [hyperliquid.h](file://include/hyperliquid.h#L229-L229)
+- [client.c](file://src/client.c#L0-L197)
+- [client_new.c](file://src/client_new.c#L0-L241)
 
-## Internal Allocation Functions
-The library provides dedicated allocation and deallocation functions for various data structures, ensuring consistent memory management practices across the codebase. These functions handle both allocation and initialization, reducing the likelihood of uninitialized memory usage.
+## Data Structure Memory Allocation
+The library employs different memory allocation strategies based on data structure characteristics. Fixed-size structures like `hl_ticker_t` and `hl_balance_t` use caller-provided buffers with stack allocation, while variable-length collections like `hl_markets_t` and `hl_orders_t` use heap allocation with ownership transfer.
 
-For order management, the library provides `hl_order_new` and `hl_order_free` functions that handle the creation and destruction of order structures. Similarly, trade structures are managed through `hl_trade_new` and `hl_trade_free` functions. These functions use `calloc` for allocation, which not only allocates memory but also initializes it to zero, preventing the use of uninitialized data.
+For stack-allocated structures, the caller declares the structure on the stack and passes its address to retrieval functions, which populate the fields directly. For heap-allocated collections, the library allocates memory for the array and individual elements, returning ownership to the caller. The `hl_order_result_t` structure uses a hybrid approach, with most fields on the stack but the `order_id` field as a dynamically allocated string that must be freed by the caller.
 
-The library also provides functions for managing collections of orders and trades. The `hl_free_orders` function iterates through an array of orders and frees each individual order before releasing the array memory. This hierarchical cleanup ensures that all allocated memory is properly released.
+**Section sources**
+- [hl_ticker.h](file://include/hl_ticker.h#L0-L101)
+- [hl_account.h](file://include/hl_account.h#L0-L215)
+- [hl_markets.h](file://include/hl_markets.h#L0-L130)
+- [hyperliquid.h](file://include/hyperliquid.h#L120-L126)
+
+## Function-Specific Memory Behavior
+Different function categories exhibit distinct memory management patterns based on their purpose and return data characteristics.
+
+### Market Data Functions
+Market data retrieval functions like `hl_fetch_markets` and `hl_fetch_ticker` follow different patterns. `hl_fetch_markets` allocates a `hl_markets_t` structure containing a dynamically allocated array of markets, transferring ownership to the caller who must free it with `hl_markets_free`. In contrast, `hl_fetch_ticker` uses a caller-provided buffer pattern where the caller allocates a `hl_ticker_t` structure (typically on the stack) and the function fills its fields.
+
+### Order and Trade Functions
+Order execution functions like `hl_create_order` use an output parameter pattern for the result, but with a critical exception: the `order_id` field in `hl_order_result_t` is dynamically allocated and must be freed by the caller. Batch operations like `hl_create_orders` apply this rule to each result in the array. For order and trade collections, functions like `hl_fetch_open_orders` allocate both the container structure and its elements, requiring the caller to free the entire structure with `hl_free_orders`.
+
+### Account Information Functions
+Account data functions follow consistent patterns based on data complexity. Simple queries like `hl_fetch_balance` use caller-provided buffers for the main structure, but when returning arrays (like spot balances), they allocate the array and require explicit cleanup with `hl_free_spot_balances`. Position queries follow a similar pattern, with `hl_fetch_positions` allocating an array that must be freed with `hl_free_positions`.
+
+**Section sources**
+- [hl_markets.h](file://include/hl_markets.h#L86-L93)
+- [hl_ticker.h](file://include/hl_ticker.h#L74-L94)
+- [hl_account.h](file://include/hl_account.h#L135-L189)
+- [hyperliquid.h](file://include/hyperliquid.h#L120-L126)
+
+## Memory Cleanup and Deallocation
+Proper memory cleanup is essential for preventing leaks and ensuring application stability. The library provides specific deallocation functions for each dynamically allocated data type, following a consistent naming convention of `hl_free_*` or `*_free`.
+
+The primary deallocation functions include:
+- `hl_client_destroy` - Cleans up client resources
+- `hl_markets_free` - Frees markets collection
+- `hl_free_orderbook` - Releases order book memory
+- `hl_tickers_free` - Cleans up tickers collection
+- `hl_free_spot_balances` - Releases spot balances array
+- `hl_free_positions` - Frees positions array
+- `hl_free_orders` - Cleans up orders collection
+- `hl_free_trades` - Releases trades collection
+
+When cleaning up collections, these functions handle both the container structure and its elements, ensuring complete memory release. For individual objects created with `hl_order_new` or `hl_trade_new`, the corresponding `hl_order_free` and `hl_trade_free` functions must be used.
 
 ```mermaid
 classDiagram
-class hl_order_t {
-+char id[64]
-+char client_order_id[64]
-+char timestamp[32]
-+char datetime[32]
-+char symbol[32]
-+double price
-+double amount
-+double filled
-+double remaining
-+double cost
-+double average
-+double stop_price
-+double trigger_price
-+bool reduce_only
-+bool post_only
-+double leverage
+class hl_client_t {
++wallet_address[43]
++private_key[65]
++testnet bool
++http http_client_t*
++timeout_ms uint32_t
++mutex pthread_mutex_t
++debug bool
 }
-class hl_trade_t {
-+char id[64]
-+char order_id[64]
-+char timestamp[32]
-+char datetime[32]
-+char symbol[32]
-+double price
-+double amount
-+double cost
+class hl_markets_t {
++markets hl_market_t*
++count size_t
+}
+class hl_orderbook_t {
++symbol[32]
++bids hl_book_level_t*
++asks hl_book_level_t*
++bids_count size_t
++asks_count size_t
++timestamp[32]
+}
+class hl_order_result_t {
++order_id char*
++status hl_order_status_t
++filled_quantity double
++average_price double
++error[256]
 }
 class hl_orders_t {
-+hl_order_t* orders
-+size_t count
++orders hl_order_t*
++count size_t
 }
 class hl_trades_t {
-+hl_trade_t* trades
-+size_t count
++trades hl_trade_t*
++count size_t
 }
-hl_order_t <|-- hl_orders_t : "contained in"
-hl_trade_t <|-- hl_trades_t : "contained in"
-hl_order_t : +hl_order_new()
-hl_order_t : +hl_order_free()
-hl_trade_t : +hl_trade_new()
-hl_trade_t : +hl_trade_free()
-hl_orders_t : +hl_free_orders()
-hl_trades_t : +hl_free_trades()
+hl_client_t --> "1" hl_client_destroy : "destructor"
+hl_markets_t --> "1" hl_markets_free : "deallocator"
+hl_orderbook_t --> "1" hl_free_orderbook : "deallocator"
+hl_order_result_t --> "1" free : "order_id cleanup"
+hl_orders_t --> "1" hl_free_orders : "deallocator"
+hl_trades_t --> "1" hl_free_trades : "deallocator"
 ```
 
 **Diagram sources**
-- [types.c](file://src/types.c#L10-L50)
-- [hl_types.h](file://include/hl_types.h#L50-L144)
+- [client.c](file://src/client.c#L89-L107)
+- [markets.c](file://src/markets.c#L416-L422)
+- [orderbook.c](file://src/orderbook.c#L220-L235)
+- [types.c](file://src/types.c#L70-L90)
+- [hyperliquid.h](file://include/hyperliquid.h#L325-L325)
 
 **Section sources**
-- [types.c](file://src/types.c#L10-L50)
-- [hl_types.h](file://include/hl_types.h#L50-L144)
+- [client.c](file://src/client.c#L89-L107)
+- [markets.c](file://src/markets.c#L416-L422)
+- [orderbook.c](file://src/orderbook.c#L220-L235)
+- [types.c](file://src/types.c#L70-L90)
 
-## Zero-Copy Design Philosophy
-The hyperliquid-c library follows a zero-copy design philosophy to minimize heap allocations and improve performance. This approach reduces memory allocation overhead and prevents memory fragmentation, which is critical for high-frequency trading applications.
+## Common Memory Management Pitfalls
+Several common memory management issues can occur when using the hyperliquid-c library, primarily related to incorrect ownership handling and improper cleanup sequences.
 
-The zero-copy principle is evident in how the library handles parsed data. Instead of creating copies of data during parsing, the library shares references to the original parsed data. This is particularly important for market data such as order books, tickers, and OHLCV data, which can be large and frequently updated.
+### Double-Free Errors
+Double-free errors occur when deallocation functions are called multiple times on the same resource. This commonly happens with `hl_client_destroy` when users mistakenly believe they need to clean up internal components separately. The client destruction function handles all internal cleanup, so calling `http_client_destroy` or similar functions on client-owned resources will lead to double-free conditions.
 
-For example, when parsing JSON responses from the API, the library extracts values directly into the target structures without creating intermediate copies. This is achieved through careful pointer management and direct assignment of parsed values to structure members. The `parse_orderbook_level` function in orderbook.c demonstrates this approach by directly assigning parsed price and quantity values to the level structure.
+### Use-After-Free Conditions
+Use-after-free conditions arise when pointers to deallocated memory are accessed. This frequently occurs with cached data like markets or order books that are freed but still referenced. Users should ensure that all references to a data structure are invalidated after calling its corresponding free function.
 
-```mermaid
-sequenceDiagram
-participant Client as "Client Application"
-participant API as "Hyperliquid API"
-participant Parser as "JSON Parser"
-participant Book as "hl_orderbook_t"
-Client->>API : Request order book
-API-->>Client : JSON response
-Client->>Parser : Parse JSON
-Parser->>Book : Direct assignment of values
-Parser-->>Client : Return order book
-Client->>Book : Use order book data
-Client->>Book : Call hl_free_orderbook()
-Book-->>Client : Memory freed
-```
+### Memory Leaks in Error Paths
+Memory leaks in error paths are a significant concern, particularly when multiple allocations occur in sequence. For example, if `hl_fetch_markets` succeeds but subsequent processing fails, users must remember to call `hl_markets_free` even in error conditions. Similarly, when processing order results, each `order_id` string must be freed regardless of the overall operation success.
 
-**Diagram sources**
-- [orderbook.c](file://src/orderbook.c#L100-L150)
-- [hyperliquid.h](file://include/hyperliquid.h#L300-L350)
-
-## Memory Management for API Responses
-The library implements careful memory management for API responses, ensuring that all dynamically allocated memory is properly tracked and released. API response handling follows a consistent pattern of allocation during parsing and deallocation through dedicated free functions.
-
-When API responses contain complex data structures like order books or trade histories, the library allocates memory for these structures during the parsing phase. The parsing functions are responsible for allocating the necessary memory and populating the structures with data from the API response. After parsing, the original response data can be freed, while the parsed data remains available for use by the application.
-
-The `hl_fetch_order_book` function exemplifies this pattern. It makes an HTTP request to fetch order book data, parses the JSON response into an `hl_orderbook_t` structure, and allocates memory for the bid and ask levels. The function returns the populated order book structure, and the caller is responsible for calling `hl_free_orderbook` when the data is no longer needed.
-
-```mermaid
-flowchart TD
-Start([API Request]) --> MakeRequest["Make HTTP request"]
-MakeRequest --> ReceiveResponse["Receive API response"]
-ReceiveResponse --> ParseData["Parse response data"]
-ParseData --> AllocateMemory["Allocate memory for data structures"]
-AllocateMemory --> PopulateStructures["Populate structures with parsed data"]
-PopulateStructures --> FreeResponse["Free original response"]
-FreeResponse --> ReturnData["Return parsed data"]
-ReturnData --> UseData["Application uses data"]
-UseData --> FreeData["Call free function"]
-FreeData --> End([Memory released])
-```
+### Incomplete Cleanup
+Incomplete cleanup occurs when only part of a complex structure is freed. For collections like `hl_orders_t`, calling `free` on the container without using `hl_free_orders` will leak the individual order objects. Users must use the provided deallocation functions that handle complete cleanup.
 
 **Section sources**
-- [orderbook.c](file://src/orderbook.c#L200-L300)
-- [hyperliquid.h](file://include/hyperliquid.h#L500-L550)
+- [client.c](file://src/client.c#L89-L107)
+- [markets.c](file://src/markets.c#L389-L411)
+- [orderbook.c](file://src/orderbook.c#L220-L235)
+- [types.c](file://src/types.c#L70-L90)
 
-## Order Book Memory Handling
-Order book memory management is a critical aspect of the library's design, given the large amount of data involved in market depth information. The library provides dedicated functions for allocating and freeing order book structures, ensuring proper memory management.
+## Stack vs Heap Allocation Strategy
+The library employs a strategic combination of stack and heap allocation based on data characteristics and usage patterns.
 
-The `hl_orderbook_t` structure contains pointers to arrays of bid and ask levels, which are allocated dynamically based on the depth of the order book. When `hl_fetch_order_book` is called, it allocates memory for these arrays using `calloc`, which initializes the memory to zero. The function also respects the requested depth parameter, limiting the number of levels to reduce memory usage when appropriate.
+### Stack Allocation Use Cases
+Stack allocation is used for:
+- Fixed-size structures with predictable memory requirements
+- Temporary data with short lifetimes
+- Input parameters and simple output structures
+- Performance-critical paths where allocation overhead must be minimized
 
-The `hl_free_orderbook` function is responsible for cleaning up order book memory. It first frees the bid and ask level arrays if they exist, then resets all structure members to their default values. This prevents use-after-free errors by ensuring that the structure is in a consistent state after cleanup.
+Examples include `hl_ticker_t`, `hl_balance_t`, and `hl_order_request_t` structures, which are typically declared on the stack and passed by reference to functions.
 
-```mermaid
-classDiagram
-class hl_orderbook_t {
-+char symbol[32]
-+hl_book_level_t* bids
-+size_t bids_count
-+hl_book_level_t* asks
-+size_t asks_count
-+uint64_t timestamp_ms
-}
-class hl_book_level_t {
-+double price
-+double quantity
-}
-hl_book_level_t <|-- hl_orderbook_t : "contained in"
-hl_orderbook_t : +hl_fetch_order_book()
-hl_orderbook_t : +hl_free_orderbook()
-hl_orderbook_t : +hl_orderbook_get_best_bid()
-hl_orderbook_t : +hl_orderbook_get_best_ask()
-hl_orderbook_t : +hl_orderbook_get_spread()
-```
+### Heap Allocation Use Cases
+Heap allocation is used for:
+- Variable-length collections and arrays
+- Data with indeterminate size at compile time
+- Objects with lifetimes that extend beyond function scope
+- Large data structures that would overflow stack limits
 
-**Diagram sources**
-- [orderbook.c](file://src/orderbook.c#L250-L300)
-- [hl_orderbook.h](file://include/hl_orderbook.h#L50-L100)
+Examples include `hl_markets_t` (markets collection), `hl_orderbook_t` (order book levels), and `hl_orders_t` (orders array), all of which require dynamic memory allocation.
+
+The choice between stack and heap allocation directly impacts the ownership model: stack-allocated structures are owned by the caller throughout their lifetime, while heap-allocated structures involve ownership transfer from the library to the caller.
 
 **Section sources**
-- [orderbook.c](file://src/orderbook.c#L250-L300)
-- [hl_orderbook.h](file://include/hl_orderbook.h#L50-L100)
+- [hl_ticker.h](file://include/hl_ticker.h#L0-L101)
+- [hl_markets.h](file://include/hl_markets.h#L0-L130)
+- [hl_orderbook.h](file://include/hl_orderbook.h#L0-L95)
+- [hl_account.h](file://include/hl_account.h#L0-L215)
 
-## Thread Safety and Cleanup Handlers
-The library incorporates thread safety mechanisms to protect shared resources and ensure proper cleanup in multi-threaded environments. The client structure includes a pthread mutex that is used to synchronize access to shared data, preventing race conditions during concurrent operations.
+## Custom Memory Allocator Integration
+While the hyperliquid-c library currently uses standard `malloc` and `free` functions, it can be adapted to work with custom memory allocators through several approaches.
 
-The mutex is initialized during client creation and destroyed during client destruction. This ensures that the mutex lifecycle is tied to the client lifecycle, preventing resource leaks. The library also follows the RAII-like pattern for mutex management, where acquisition and release are paired within function scopes.
+The most straightforward method is to override the standard library functions at link time by providing custom implementations of `malloc`, `free`, `calloc`, and `realloc`. This approach requires no changes to the library code and works transparently with all allocation sites.
 
-In addition to mutex management, the library could benefit from pthread cleanup handlers to ensure proper resource cleanup in case of thread cancellation. While not explicitly implemented in the current code, this would be a valuable addition for applications that use thread cancellation.
+For more granular control, wrapper functions can be created that use custom allocators for specific data types. For example, a memory pool could be used for frequently allocated objects like `hl_order_t` and `hl_trade_t` by modifying the `hl_order_new` and `hl_trade_new` functions to use pool allocation instead of `calloc`.
 
-```mermaid
-sequenceDiagram
-participant Thread1 as "Thread 1"
-participant Thread2 as "Thread 2"
-participant Client as "hl_client_t"
-participant Mutex as "pthread_mutex_t"
-Thread1->>Client : Call API function
-Client->>Mutex : pthread_mutex_lock()
-Mutex-->>Client : Lock acquired
-Client->>API : Make request
-API-->>Client : Receive response
-Client->>Mutex : pthread_mutex_unlock()
-Mutex-->>Client : Lock released
-Client-->>Thread1 : Return result
-Thread2->>Client : Call API function
-Client->>Mutex : pthread_mutex_lock()
-Mutex-->>Client : Wait for lock
-Client-->>Thread2 : Block until lock available
-```
+When integrating with custom allocators, it's crucial to maintain consistency: if a custom allocator is used for allocation, the corresponding custom deallocator must be used for cleanup. Mixing standard and custom allocators will lead to undefined behavior and potential crashes.
 
 **Section sources**
-- [client.c](file://src/client.c#L50-L100)
-- [hyperliquid.h](file://include/hyperliquid.h#L100-L150)
+- [types.c](file://src/types.c#L12-L38)
+- [client.c](file://src/client.c#L89-L107)
+- [markets.c](file://src/markets.c#L416-L422)
 
-## Common Memory Issues
-The library addresses several common memory management issues through careful design and implementation. These include double-free, use-after-free, and memory leaks from unhandled error paths.
+## Memory Issue Detection and Debugging
+Several tools and techniques can be employed to detect and debug memory issues when using the hyperliquid-c library.
 
-To prevent double-free errors, the library follows the convention of setting pointers to NULL after freeing them. This is evident in the `hl_free_orderbook` function, which sets the bid and ask pointers to NULL after freeing the associated memory. This practice ensures that subsequent calls to free functions are safe, as they check for NULL pointers before attempting to free memory.
+### Static Analysis
+Static analysis tools like `clang-tidy` and `cppcheck` can identify potential memory management issues in user code, such as missing deallocations, use-after-free conditions, and incorrect function usage patterns.
 
-Use-after-free errors are prevented through proper lifecycle management and clear documentation of ownership semantics. The library clearly defines which functions allocate memory and which functions are responsible for freeing it. For example, functions that return dynamically allocated data clearly document that the caller is responsible for freeing the memory.
+### Dynamic Analysis
+Dynamic analysis tools are particularly effective:
+- **AddressSanitizer (ASan)**: Detects use-after-free, double-free, and memory leaks
+- **Valgrind**: Identifies memory leaks, invalid memory access, and mismatched allocation/deallocation
+- **UndefinedBehaviorSanitizer (UBSan)**: Catches undefined behavior related to memory operations
 
-Memory leaks from unhandled error paths are mitigated through careful resource cleanup in error conditions. Functions that allocate multiple resources check for errors after each allocation and clean up previously allocated resources if a subsequent allocation fails. This is demonstrated in the `hl_client_new` function, which frees the client structure if configuration initialization fails.
+### Debugging Best Practices
+Implement the following best practices:
+1. Always pair allocation with deallocation in the same scope when possible
+2. Use RAII-like patterns with cleanup functions at function exit points
+3. Initialize pointers to NULL after freeing to catch use-after-free errors
+4. Check return values of allocation functions for NULL before use
+5. Use defensive programming by validating pointers before dereferencing
 
-```mermaid
-flowchart TD
-Start([Function Entry]) --> Allocate1["Allocate first resource"]
-Allocate1 --> Success1{"Allocation successful?"}
-Success1 --> |No| ReturnError["Return error"]
-Success1 --> |Yes| Allocate2["Allocate second resource"]
-Allocate2 --> Success2{"Allocation successful?"}
-Success2 --> |No| Cleanup1["Free first resource"]
-Cleanup1 --> ReturnError
-Success2 --> |Yes| Allocate3["Allocate third resource"]
-Allocate3 --> Success3{"Allocation successful?"}
-Success3 --> |No| Cleanup2["Free second resource"]
-Cleanup2 --> Cleanup1
-Success3 --> |Yes| Process["Process data"]
-Process --> ReturnSuccess["Return success"]
-ReturnError --> End([Exit])
-ReturnSuccess --> End
-```
+The library's error handling system, combined with proper memory management, ensures robust operation even in failure conditions.
 
 **Section sources**
-- [client_new.c](file://src/client_new.c#L18-L68)
-- [types.c](file://src/types.c#L60-L90)
-- [orderbook.c](file://src/orderbook.c#L150-L200)
-
-## Debugging Strategies
-Effective debugging of memory issues in the hyperliquid-c library requires the use of specialized tools and techniques. Valgrind is particularly valuable for detecting memory leaks, use-after-free errors, and double-free conditions.
-
-When using Valgrind, it's important to test both normal operation and error paths to ensure that all memory is properly cleaned up. This includes testing client creation and destruction, API calls that succeed and fail, and edge cases such as network timeouts and invalid parameters.
-
-The library could benefit from additional debugging features such as memory allocation tracking and logging. These features would help identify memory usage patterns and potential issues in production environments. Debug builds could include additional checks for common memory errors, such as writing to freed memory or accessing uninitialized data.
-
-For applications with strict memory constraints, it's recommended to monitor memory usage over time and profile the application under realistic workloads. This helps identify potential memory leaks or excessive memory allocation patterns that could impact performance.
-
-**Section sources**
-- [client.c](file://src/client.c)
-- [types.c](file://src/types.c)
-- [orderbook.c](file://src/orderbook.c)
-
-## Best Practices
-When integrating the hyperliquid-c library into applications with strict memory constraints, several best practices should be followed to ensure optimal memory management.
-
-First, always pair resource creation with destruction. For every `hl_client_new` call, there should be a corresponding `hl_client_destroy` call. This ensures that all allocated resources are properly cleaned up, preventing memory leaks.
-
-Second, follow the library's ownership semantics carefully. When functions return dynamically allocated data, ensure that the appropriate free function is called when the data is no longer needed. This includes calling `hl_free_orderbook` for order books, `hl_free_orders` for order arrays, and `hl_free_trades` for trade arrays.
-
-Third, handle error conditions properly. Check return values from all library functions and clean up any allocated resources in error paths. This prevents memory leaks when operations fail.
-
-Fourth, consider the frequency of API calls and their memory impact. For high-frequency applications, cache data when possible and minimize the creation and destruction of client instances.
-
-Finally, use debugging tools like Valgrind to verify memory management correctness, especially when integrating the library into new applications or making significant changes to existing code.
-
-**Section sources**
-- [client.c](file://src/client.c)
-- [types.c](file://src/types.c)
-- [orderbook.c](file://src/orderbook.c)
-- [hyperliquid.h](file://include/hyperliquid.h)
+- [client.c](file://src/client.c#L89-L107)
+- [types.c](file://src/types.c#L12-L38)
+- [hyperliquid.h](file://include/hyperliquid.h#L1-L617)

@@ -2,370 +2,156 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [simple_trade.c](file://examples/simple_trade.c)
-- [trading_bot.c](file://examples/trading_bot.c)
-- [hyperliquid.h](file://include/hyperliquid.h)
-- [trading_api.c](file://src/trading_api.c)
-- [serialize.c](file://src/msgpack/serialize.c)
-- [eip712.c](file://src/crypto/eip712.c)
-- [client.c](file://src/http/client.c)
+- [hl_order_request_t](file://include/hyperliquid.h#L108-L117)
+- [hl_order_result_t](file://include/hyperliquid.h#L120-L126)
+- [hl_cancel_result_t](file://include/hyperliquid.h#L129-L132)
+- [hl_place_order](file://src/trading_api.c#L79-L220)
+- [hl_cancel_order](file://src/trading_api.c#L225-L338)
+- [hl_edit_order](file://src/orders.c#L678-L727)
+- [hl_create_orders](file://src/orders.c#L601-L627)
+- [hl_cancel_orders](file://src/orders.c#L629-L655)
+- [hl_fetch_open_orders](file://src/orders.c#L18-L104)
+- [hl_fetch_closed_orders](file://src/orders.c#L109-L219)
+- [hl_fetch_canceled_orders](file://src/orders.c#L224-L334)
+- [hl_fetch_canceled_and_closed_orders](file://src/orders.c#L339-L455)
+- [hl_fetch_orders](file://src/orders.c#L457-L599)
+- [hl_fetch_order](file://src/orders.c#L507-L555)
+- [hl_error_t](file://include/hl_error.h#L10-L37)
 </cite>
 
 ## Table of Contents
-1. [Introduction](#introduction)
-2. [Order Request Structure](#order-request-structure)
-3. [Order Placement Workflow](#order-placement-workflow)
-4. [Order Cancellation and Modification](#order-cancellation-and-modification)
-5. [Batch Operations](#batch-operations)
-6. [Underlying Process Flow](#underlying-process-flow)
-7. [Error Handling and Result Processing](#error-handling-and-result-processing)
-8. [Idempotency, Rate Limiting, and Lifecycle Management](#idempotency-rate-limiting-and-lifecycle-management)
-9. [Best Practices](#best-practices)
-10. [Real Usage Examples](#real-usage-examples)
+1. [Order Placement](#order-placement)
+2. [Order Cancellation](#order-cancellation)
+3. [Order Modification](#order-modification)
+4. [Order Lifecycle Management](#order-lifecycle-management)
+5. [Order Response Handling](#order-response-handling)
+6. [Error Handling and Codes](#error-handling-and-codes)
 
-## Introduction
-This document provides comprehensive coverage of trading operations within the Hyperliquid C SDK. It details the complete workflow for placing, canceling, and modifying orders, including the structure of order requests, batch operations, error handling, and underlying implementation processes. The documentation explains the full sequence from request validation through MessagePack serialization, EIP-712 signing, HTTP transmission, and response parsing. Real-world usage patterns are illustrated through analysis of example implementations in simple_trade.c and trading_bot.c.
+## Order Placement
 
-## Order Request Structure
-The order request structure defines all parameters necessary for executing trades on the Hyperliquid exchange. The `hl_order_request_t` structure contains essential trading parameters that control order execution behavior.
+The `hl_place_order()` function enables users to submit new trading orders to the Hyperliquid exchange. This function accepts a client instance, an order request structure, and returns a result structure containing the outcome of the operation.
 
-**Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L127-L136)
+The `hl_order_request_t` structure defines the parameters for order creation:
+- **symbol**: Trading symbol (e.g., "BTC", "ETH")
+- **side**: Buy or sell direction
+- **price**: Limit price (set to 0 for market orders)
+- **quantity**: Order quantity
+- **order_type**: Limit or market order type
+- **time_in_force**: Currently defaults to "Gtc" (Good Till Cancel)
+- **reduce_only**: Flag indicating if the order should only reduce position
+- **slippage_bps**: Slippage tolerance in basis points (for market orders)
 
-### Core Parameters
-The order request includes the following key parameters:
-
-- **symbol**: Trading symbol (e.g., "BTC", "ETH") specifying the asset to trade
-- **side**: Order direction using `hl_side_t` enum (HL_SIDE_BUY or HL_SIDE_SELL)
-- **price**: Limit price for the order (set to 0 for market orders)
-- **quantity**: Amount of the asset to buy or sell
-- **order_type**: Using `hl_order_type_t` enum (HL_ORDER_TYPE_LIMIT or HL_ORDER_TYPE_MARKET)
-- **time_in_force**: Execution instruction via `hl_time_in_force_t` enum (HL_TIF_GTC, HL_TIF_IOC, or HL_TIF_ALO)
-- **reduce_only**: Boolean flag indicating if the order should only reduce existing positions
-- **slippage_bps**: Slippage tolerance in basis points (used for market orders)
-
-These parameters provide complete control over order execution characteristics, allowing traders to specify precise trading strategies.
-
-## Order Placement Workflow
-The order placement workflow involves a series of steps from request validation to API response processing. The `hl_place_order` function implements this workflow, ensuring secure and reliable order submission.
-
-```mermaid
-sequenceDiagram
-participant Application as "Application"
-participant SDK as "Hyperliquid SDK"
-participant Exchange as "Hyperliquid Exchange"
-Application->>SDK : hl_place_order(request)
-SDK->>SDK : Validate parameters
-SDK->>SDK : Get asset ID
-SDK->>SDK : Build order structure
-SDK->>SDK : Generate nonce
-SDK->>SDK : Build action hash
-SDK->>SDK : EIP-712 sign
-SDK->>SDK : Build JSON request
-SDK->>Exchange : HTTP POST /exchange
-Exchange-->>SDK : JSON response
-SDK->>SDK : Parse response
-SDK->>Application : Return result
-```
-
-**Diagram sources**
-- [trading_api.c](file://src/trading_api.c#L79-L220)
-- [hyperliquid.h](file://include/hyperliquid.h#L276-L278)
+Market orders are executed immediately at the best available price, while limit orders are placed at the specified price and executed when market conditions match. The function handles EIP-712 signing for transaction security and communicates with the exchange API endpoint to submit the order.
 
 **Section sources**
-- [trading_api.c](file://src/trading_api.c#L79-L220)
-- [hyperliquid.h](file://include/hyperliquid.h#L276-L278)
+- [hl_order_request_t](file://include/hyperliquid.h#L108-L117)
+- [hl_place_order](file://src/trading_api.c#L79-L220)
 
-### Workflow Steps
-1. **Parameter Validation**: The function first validates that the client, request, and result pointers are not null
-2. **Client Data Extraction**: Wallet address, private key, testnet flag, HTTP client, and mutex are extracted from the client structure
-3. **Asset ID Resolution**: The symbol is converted to an asset ID by querying market data
-4. **Order Construction**: An `hl_order_t` structure is built with formatted price and size strings
-5. **Nonce Generation**: Current timestamp in milliseconds is used as a nonce for request uniqueness
-6. **Action Hash Creation**: MessagePack serialization creates a hash of the order action
-7. **EIP-712 Signing**: The hash is signed using Ethereum's EIP-712 standard for secure authentication
-8. **Request Building**: A JSON request is constructed containing the action, nonce, signature, and vault address
-9. **HTTP Transmission**: The request is sent via POST to the appropriate API endpoint (testnet or mainnet)
-10. **Response Processing**: The JSON response is parsed to extract the order ID and status
+## Order Cancellation
 
-The workflow ensures thread safety through mutex locking during critical sections and proper memory management throughout the process.
+Order cancellation is supported through two primary functions: `hl_cancel_order()` for single order cancellation and `hl_cancel_orders()` for batch operations.
 
-## Order Cancellation and Modification
-Order cancellation and modification operations allow traders to manage their active orders. The SDK provides functions for canceling individual orders, canceling all orders for a symbol, and modifying existing orders.
+The `hl_cancel_order()` function requires:
+- **client**: Client instance for authentication
+- **symbol**: Trading symbol associated with the order
+- **order_id**: Unique identifier of the order to cancel
+- **result**: Output structure containing cancellation result
 
-```mermaid
-sequenceDiagram
-participant Application as "Application"
-participant SDK as "Hyperliquid SDK"
-participant Exchange as "Hyperliquid Exchange"
-Application->>SDK : hl_cancel_order(symbol, order_id)
-SDK->>SDK : Validate parameters
-SDK->>SDK : Get asset ID
-SDK->>SDK : Parse order ID
-SDK->>SDK : Build cancel structure
-SDK->>SDK : Generate nonce
-SDK->>SDK : Build action hash
-SDK->>SDK : EIP-712 sign
-SDK->>SDK : Build JSON request
-SDK->>Exchange : HTTP POST /exchange
-Exchange-->>SDK : JSON response
-SDK->>SDK : Parse response
-SDK->>Application : Return result
-```
+For batch cancellation, `hl_cancel_orders()` accepts an array of order IDs and returns an array of results. This enables efficient cancellation of multiple orders in a single operation, with each cancellation processed individually and results collected in the output array.
 
-**Diagram sources**
-- [trading_api.c](file://src/trading_api.c#L225-L338)
-- [hyperliquid.h](file://include/hyperliquid.h#L289-L292)
+The cancellation process involves:
+1. Validating input parameters
+2. Retrieving asset ID for the specified symbol
+3. Building the cancellation request structure
+4. Creating and signing the EIP-712 message
+5. Submitting the cancellation request to the exchange API
 
 **Section sources**
-- [trading_api.c](file://src/trading_api.c#L225-L338)
-- [hyperliquid.h](file://include/hyperliquid.h#L289-L292)
+- [hl_cancel_order](file://src/trading_api.c#L225-L338)
+- [hl_cancel_orders](file://src/orders.c#L629-L655)
+- [hl_cancel_result_t](file://include/hyperliquid.h#L129-L132)
 
-### Cancellation Process
-The `hl_cancel_order` function follows a similar security workflow to order placement:
+## Order Modification
 
-1. **Parameter Validation**: Validates input parameters including symbol and order ID
-2. **Asset Resolution**: Converts the trading symbol to its corresponding asset ID
-3. **Order ID Parsing**: Converts the string order ID to a numeric value
-4. **Cancel Structure Creation**: Builds an `hl_cancel_t` structure with asset ID and order ID
-5. **Nonce Generation**: Uses current timestamp as nonce for request uniqueness
-6. **Hash Generation**: Creates a MessagePack hash of the cancel action
-7. **EIP-712 Signing**: Signs the hash using the private key
-8. **Request Construction**: Builds a JSON request with the cancel action, nonce, and signature
-9. **API Submission**: Sends the request to the exchange endpoint
-10. **Response Handling**: Parses the response to determine cancellation success
+Order modification is implemented through the `hl_edit_order()` function, which follows a cancel-and-create pattern. This approach ensures atomicity and consistency in order updates.
 
-The `hl_modify_order` function (not fully implemented in provided code) would typically follow a cancel-and-replace pattern, first canceling the existing order and then placing a new one with modified parameters.
+The modification process:
+1. Takes the existing order ID and new order parameters
+2. Cancels the original order using `hl_cancel_order()`
+3. Creates a new order with updated parameters using `hl_place_order()`
+4. Returns the result of the new order creation
 
-## Batch Operations
-The SDK supports batch operations for placing or canceling multiple orders atomically. These operations improve efficiency by reducing the number of API calls and network round trips.
+This implementation provides a reliable way to update order parameters such as price, quantity, or time-in-force settings. The function handles error propagation from both the cancellation and creation steps, ensuring that failures in either phase are properly reported.
 
 **Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L338-L354)
+- [hl_edit_order](file://src/orders.c#L678-L727)
 
-### Batch Placement
-The `hl_create_orders` function allows placing multiple orders in a single API call:
+## Order Lifecycle Management
 
-- Accepts an array of `hl_order_request_t` structures
-- Processes each order request through validation and construction
-- Combines multiple orders into a single action with appropriate grouping
-- Signs the combined action hash using EIP-712
-- Submits all orders atomically in one HTTP request
+The system provides comprehensive functions for tracking orders throughout their lifecycle from submission to execution or rejection.
 
-### Batch Cancellation
-The `hl_cancel_orders` function enables canceling multiple orders simultaneously:
+Key order retrieval functions include:
+- **hl_fetch_open_orders()**: Retrieves currently active orders
+- **hl_fetch_closed_orders()**: Retrieves filled or partially filled orders
+- **hl_fetch_canceled_orders()**: Retrieves orders that were canceled
+- **hl_fetch_canceled_and_closed_orders()**: Retrieves both canceled and closed orders
+- **hl_fetch_orders()**: Retrieves all orders regardless of status
+- **hl_fetch_order()**: Retrieves a specific order by ID
 
-- Takes an array of order IDs to cancel
-- Builds a cancel action containing multiple cancel requests
-- Generates a single signature for the entire batch operation
-- Submits the batch cancellation request to the exchange
+These functions query the exchange API to obtain order information, parse the JSON response, and populate the `hl_orders_t` structure with order details. The order status field indicates the current state of the order, with possible values including "open", "closed", and "canceled".
 
-Batch operations maintain the same security model as individual operations while providing significant performance benefits for algorithmic trading strategies that require multiple order adjustments.
-
-## Underlying Process Flow
-The trading operations rely on a sophisticated underlying process that ensures security, reliability, and compatibility with the Hyperliquid exchange. This process spans multiple layers of the SDK architecture.
-
-```mermaid
-flowchart TD
-A[Order Request] --> B[Parameter Validation]
-B --> C[Asset ID Resolution]
-C --> D[Order Structure]
-D --> E[Nonce Generation]
-E --> F[MessagePack Serialization]
-F --> G[EIP-712 Signing]
-G --> H[JSON Request Building]
-H --> I[HTTP POST Request]
-I --> J[Response Parsing]
-J --> K[Result Processing]
-F --> |hl_build_order_hash| M[serialize.c]
-G --> |eip712_sign_agent| N[eip712.c]
-I --> |http_client_post| O[client.c]
-```
-
-**Diagram sources**
-- [trading_api.c](file://src/trading_api.c#L79-L338)
-- [serialize.c](file://src/msgpack/serialize.c#L206-L219)
-- [eip712.c](file://src/crypto/eip712.c#L260-L295)
-- [client.c](file://src/http/client.c#L120-L167)
+The order lifecycle typically follows this sequence:
+1. Order submission via `hl_place_order()`
+2. Order status becomes "open" upon successful submission
+3. Order may be partially or fully filled, updating the filled quantity
+4. Order status changes to "closed" when completely filled
+5. Order status changes to "canceled" if explicitly canceled or rejected
 
 **Section sources**
-- [trading_api.c](file://src/trading_api.c#L79-L338)
-- [serialize.c](file://src/msgpack/serialize.c#L206-L219)
-- [eip712.c](file://src/crypto/eip712.c#L260-L295)
-- [client.c](file://src/http/client.c#L120-L167)
+- [hl_fetch_open_orders](file://src/orders.c#L18-L104)
+- [hl_fetch_closed_orders](file://src/orders.c#L109-L219)
+- [hl_fetch_canceled_orders](file://src/orders.c#L224-L334)
+- [hl_fetch_canceled_and_closed_orders](file://src/orders.c#L339-L455)
+- [hl_fetch_orders](file://src/orders.c#L457-L599)
+- [hl_fetch_order](file://src/orders.c#L507-L555)
 
-### Key Components
-#### MessagePack Serialization
-The `hl_build_order_hash` function in serialize.c implements MessagePack serialization to create a deterministic byte representation of the order action. This ensures compatibility with the Go-based backend and provides a secure foundation for cryptographic operations.
+## Order Response Handling
 
-#### EIP-712 Signing
-The `eip712_sign_agent` function in eip712.c implements Ethereum's EIP-712 standard for structured data signing. This provides secure authentication by:
-- Computing domain hash with exchange name and chain ID
-- Creating struct hash for the agent action
-- Generating signing hash with the EIP-191 prefix
-- Using secp256k1 ECDSA with proper recovery ID determination
+Successful order operations return results through dedicated result structures that provide detailed information about the transaction outcome.
 
-#### HTTP Communication
-The `http_client_post` function in client.c handles the HTTP transport layer, managing:
-- Connection configuration and timeout settings
-- Request body and header construction
-- Response handling and error detection
-- Memory management for response data
-
-The process flow ensures that all trading operations are secure, reliable, and efficient, with proper error handling at each stage.
-
-## Error Handling and Result Processing
-The SDK implements comprehensive error handling and result processing to provide clear feedback on trading operations.
-
-**Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L139-L151)
-- [trading_api.c](file://src/trading_api.c#L79-L338)
-
-### Order Result Structure
-The `hl_order_result_t` structure provides detailed information about order execution:
-
-- **order_id**: Allocated string containing the exchange-assigned order ID (caller must free)
-- **status**: Order status using `hl_order_status_t` enum (OPEN, FILLED, PARTIALLY_FILLED, CANCELLED, REJECTED)
+The `hl_order_result_t` structure contains:
+- **order_id**: Unique identifier assigned by the exchange
+- **status**: Current order status
 - **filled_quantity**: Amount of the order that has been filled
 - **average_price**: Average execution price for filled portions
-- **error**: Character array containing error messages (256 bytes)
+- **error**: Error message string in case of failure
 
-### Cancel Result Structure
-The `hl_cancel_result_t` structure indicates cancellation success:
+The `hl_cancel_result_t` structure provides:
+- **cancelled**: Boolean indicating successful cancellation
+- **error**: Error message string if cancellation failed
 
-- **cancelled**: Boolean flag indicating successful cancellation
-- **error**: Character array containing error messages (256 bytes)
+These result structures enable applications to track order execution, update user interfaces, and implement appropriate business logic based on order status changes. The order ID returned in successful placements can be used for subsequent operations such as cancellation or status queries.
 
-### Error Codes
-The SDK returns specific error codes to help diagnose issues:
+**Section sources**
+- [hl_order_result_t](file://include/hyperliquid.h#L120-L126)
+- [hl_cancel_result_t](file://include/hyperliquid.h#L129-L132)
 
+## Error Handling and Codes
+
+The trading API implements a comprehensive error handling system with specific error codes for different failure scenarios.
+
+Key error codes defined in `hl_error_t` include:
 - **HL_SUCCESS**: Operation completed successfully
 - **HL_ERROR_INVALID_PARAMS**: Invalid input parameters
 - **HL_ERROR_NETWORK**: Network communication failure
 - **HL_ERROR_API**: API request failed
+- **HL_ERROR_AUTH**: Authentication failure
 - **HL_ERROR_INVALID_SYMBOL**: Unknown trading symbol
-- **HL_ERROR_SIGNATURE**: Signature generation failed
+- **HL_ERROR_SIGNATURE**: Signature generation or validation failure
 
-Applications should check the return value and inspect the result structure's error field for detailed error information when operations fail.
+These error codes enable applications to implement appropriate error recovery strategies and provide meaningful feedback to users. The system also includes replay protection through nonce generation based on timestamps, preventing duplicate order submissions.
 
-## Idempotency, Rate Limiting, and Lifecycle Management
-Effective trading operations require understanding of idempotency, rate limiting, and order lifecycle management.
-
-**Section sources**
-- [trading_api.c](file://src/trading_api.c#L79-L338)
-
-### Idempotency
-The system uses timestamp-based nonces to ensure request uniqueness. Each request includes a nonce derived from the current timestamp in milliseconds, preventing replay attacks and ensuring that identical requests are treated as distinct operations.
-
-### Rate Limiting
-While specific rate limits are not exposed in the SDK code, applications should implement appropriate throttling to avoid overwhelming the exchange API. Best practices include:
-- Implementing exponential backoff for failed requests
-- Limiting the frequency of order operations
-- Using batch operations to reduce API call volume
-- Monitoring response times for signs of throttling
-
-### Order Lifecycle Management
-Orders progress through a defined lifecycle:
-1. **OPEN**: Order is placed and waiting for execution
-2. **PARTIALLY_FILLED**: Order has executed partially
-3. **FILLED**: Order has been completely filled
-4. **CANCELLED**: Order was canceled before complete execution
-5. **REJECTED**: Order was rejected by the exchange
-
-Applications should regularly poll for order status updates or use WebSocket subscriptions to receive real-time updates on order state changes.
-
-## Best Practices
-Implementing effective trading operations requires adherence to several best practices.
+The API ensures thread safety through mutex locking during critical operations, protecting against race conditions in multi-threaded environments. Idempotency is maintained through the use of unique nonces and proper error handling, ensuring consistent behavior across multiple attempts.
 
 **Section sources**
-- [simple_trade.c](file://examples/simple_trade.c)
-- [trading_bot.c](file://examples/trading_bot.c)
-
-### Handling Partial Fills
-When dealing with partial fills:
-- Regularly check the `filled_quantity` field in order results
-- Implement logic to handle partially filled orders appropriately
-- Consider using IOC (Immediate or Cancel) orders for strategies requiring full execution
-- Monitor for additional fills on partially filled orders
-
-### Order Status Updates
-For reliable order status tracking:
-- Use `hl_fetch_order` to get detailed information about specific orders
-- Implement periodic polling of open orders using `hl_fetch_open_orders`
-- Consider using WebSocket connections for real-time order updates
-- Store order IDs locally to track order state across application sessions
-
-### Resource Management
-Proper resource management is critical:
-- Always free allocated strings in result structures (order_id)
-- Handle mutex locking appropriately in multi-threaded environments
-- Clean up client resources using `hl_client_destroy`
-- Free dynamically allocated arrays returned by fetch functions
-
-### Error Recovery
-Implement robust error recovery:
-- Retry failed operations with appropriate backoff
-- Validate order parameters before submission
-- Check balance and position information before placing orders
-- Implement circuit breaker patterns for sustained failures
-
-## Real Usage Examples
-The SDK provides example implementations that demonstrate real-world usage patterns for trading operations.
-
-```mermaid
-flowchart TD
-A[simple_trade.c] --> B[Client Initialization]
-B --> C[Connection Test]
-C --> D[Balance Query]
-D --> E[Market Price Fetch]
-E --> F[Order Placement]
-F --> G[Order Cancellation]
-G --> H[Position Check]
-H --> I[Cleanup]
-J[trading_bot.c] --> K[Client Setup]
-K --> L[Signal Handling]
-L --> M[Balances Display]
-M --> N[Markets Display]
-N --> O[Ticker Display]
-O --> P[Interactive Menu]
-P --> Q[Order Placement]
-Q --> R[Order Cancellation]
-R --> S[WebSocket Setup]
-S --> T[Bot Loop]
-T --> U[Cleanup]
-```
-
-**Diagram sources**
-- [simple_trade.c](file://examples/simple_trade.c)
-- [trading_bot.c](file://examples/trading_bot.c)
-
-**Section sources**
-- [simple_trade.c](file://examples/simple_trade.c)
-- [trading_bot.c](file://examples/trading_bot.c)
-
-### simple_trade.c Analysis
-The simple_trade.c example demonstrates a complete trading workflow:
-- Initializes the client with wallet and private key from environment variables
-- Tests the connection to ensure API accessibility
-- Retrieves account balance information
-- Fetches current market price for BTC
-- Places a limit buy order at 20% below market price
-- Checks order status and cancels the order if still open
-- Retrieves and displays open positions
-- Properly cleans up resources
-
-This example serves as a template for basic trading operations and error handling.
-
-### trading_bot.c Analysis
-The trading_bot.c example implements a more sophisticated trading bot:
-- Uses signal handlers for graceful shutdown
-- Implements an interactive menu system
-- Demonstrates WebSocket integration for real-time data
-- Shows balance and market information display
-- Implements a bot loop with periodic updates
-- Handles order placement and cancellation through user interaction
-- Includes comprehensive error handling and cleanup
-
-This example illustrates how to build a production-ready trading application with real-time data feeds and user interaction.
-
-Both examples provide valuable insights into proper SDK usage patterns, error handling, and resource management for trading applications.
+- [hl_error_t](file://include/hl_error.h#L10-L37)

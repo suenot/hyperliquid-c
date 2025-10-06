@@ -2,157 +2,191 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [hyperliquid.h](file://include/hyperliquid.h)
-- [hl_logger.h](file://include/hl_logger.h)
+- [hl_error.h](file://include/hl_error.h)
 - [client.c](file://src/client.c)
 - [trading_api.c](file://src/trading_api.c)
-- [simple_trade.c](file://examples/simple_trade.c)
-- [trading_bot.c](file://examples/trading_bot.c)
+- [orders.c](file://src/orders.c)
+- [ARCHITECTURE.md](file://ARCHITECTURE.md)
 </cite>
 
 ## Table of Contents
-1. [Error Code Convention](#error-code-convention)
-2. [Defined Error Codes](#defined-error-codes)
-3. [Return Value Interpretation](#return-value-interpretation)
-4. [Error Checking Patterns](#error-checking-patterns)
-5. [Recoverable vs Unrecoverable Errors](#recoverable-vs-unrecoverable-errors)
-6. [Error Logging](#error-logging)
-7. [Common Error Scenarios](#common-error-scenarios)
-8. [Retry Strategies](#retry-strategies)
+1. [Error Code Enumeration](#error-code-enumeration)
+2. [Error Retrieval Mechanisms](#error-retrieval-mechanisms)
+3. [Error Propagation Across Layers](#error-propagation-across-layers)
+4. [Error Handling in Trading Workflows](#error-handling-in-trading-workflows)
+5. [Validation vs System Errors](#validation-vs-system-errors)
+6. [Error Code Reference](#error-code-reference)
 
-## Error Code Convention
+## Error Code Enumeration
 
-The Hyperliquid C SDK follows a standardized error code convention where negative integer values indicate specific error conditions and zero indicates success. This pattern is consistent across all API functions and simplifies error checking in client applications. All functions that can fail return a value of type `hl_error_t`, which is an enumeration defined in the SDK.
+The Hyperliquid C SDK defines a comprehensive error enumeration through the `hl_error_t` type, which provides standardized error codes across all API operations. These error codes follow a consistent pattern where `HL_SUCCESS = 0` indicates successful execution, and all error conditions are represented by negative integer values.
+
+The enumeration provides clear semantic meaning for different failure modes, enabling developers to implement appropriate recovery strategies based on the specific error type encountered. The error codes are designed to be stable and backward compatible, ensuring consistent error handling across SDK versions.
 
 **Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L58-L85)
+- [hl_error.h](file://include/hl_error.h#L15-L35)
 
-## Defined Error Codes
+## Error Retrieval Mechanisms
 
-The following error codes are defined in the Hyperliquid C SDK, primarily in `hyperliquid.h`. These codes cover network issues, authentication failures, invalid parameters, and rate limiting scenarios.
+The SDK provides two primary functions for retrieving error information: `hl_get_last_error()` (represented by return value patterns) and `hl_get_error_message()` (implemented as `hl_error_string()`). These functions work in tandem to provide both programmatic and human-readable error information.
 
-```c
-typedef enum {
-    HL_SUCCESS = 0,                          // Operation successful
-    HL_ERROR_INVALID_PARAMS = -1,           // Invalid parameters
-    HL_ERROR_NETWORK = -2,                  // Network error
-    HL_ERROR_API = -3,                      // API error
-    HL_ERROR_AUTH = -4,                     // Authentication error
-    HL_ERROR_INSUFFICIENT_BALANCE = -5,     // Insufficient balance
-    HL_ERROR_INVALID_SYMBOL = -6,           // Invalid trading symbol
-    HL_ERROR_ORDER_REJECTED = -7,           // Order rejected by exchange
-    HL_ERROR_SIGNATURE = -8,                // Signature generation failed
-    HL_ERROR_MSGPACK = -9,                  // MessagePack error
-    HL_ERROR_JSON = -10,                    // JSON parsing error
-    HL_ERROR_MEMORY = -11,                  // Memory allocation failed
-    HL_ERROR_TIMEOUT = -12,                 // Operation timed out
-    HL_ERROR_NOT_IMPLEMENTED = -13,         // Feature not implemented
-    HL_ERROR_NOT_FOUND = -14,               // Resource not found
-    HL_ERROR_PARSE = -15                    // Response parsing error
-} hl_error_t;
+The `hl_error_string()` function converts error codes into descriptive messages, facilitating debugging and logging. This function is thread-safe and can be called from any context where error information needs to be presented to users or written to logs. The error message system is designed to be lightweight and does not require dynamic memory allocation, making it suitable for use in constrained environments.
+
+Error retrieval follows a immediate-consumption pattern where the error state is typically returned directly from function calls rather than maintained in a global state, reducing the risk of error state corruption in multi-threaded applications.
+
+**Section sources**
+- [client.c](file://src/client.c#L142-L183)
+
+## Error Propagation Across Layers
+
+### HTTP Layer Error Propagation
+
+Errors originating from the HTTP layer are systematically converted to the SDK's error code system through the `lv3_to_hl_error()` function. Network connectivity issues, timeouts, and HTTP protocol errors are mapped to appropriate SDK error codes such as `HL_ERROR_NETWORK` and `HL_ERROR_TIMEOUT`. The HTTP client implementation ensures that all network-related failures are properly propagated up the call stack with appropriate error context.
+
+### WebSocket Layer Error Propagation
+
+WebSocket errors are handled through callback mechanisms that convert low-level WebSocket events into SDK error codes. Connection failures, message parsing errors, and subscription issues are translated into appropriate error codes and made available through the SDK's error handling interface. The WebSocket client implementation includes automatic reconnection logic for transient failures, with error propagation occurring only when reconnection attempts are exhausted.
+
+### Business Logic Error Propagation
+
+Business logic errors follow a consistent propagation pattern where functions return error codes directly to callers. The implementation ensures that errors are not silently consumed and are propagated up the call stack until handled. In composite operations like order editing (implemented as cancel + create), the error handling system preserves the first encountered error while continuing to process remaining operations when appropriate.
+
+```mermaid
+sequenceDiagram
+participant Application
+participant TradingAPI
+participant HTTPClient
+participant Exchange
+Application->>TradingAPI : hl_place_order()
+TradingAPI->>TradingAPI : Validate parameters
+alt Invalid parameters
+TradingAPI-->>Application : HL_ERROR_INVALID_PARAMS
+else Valid parameters
+TradingAPI->>HTTPClient : Make signed request
+HTTPClient->>Exchange : POST /exchange
+alt Network failure
+HTTPClient-->>TradingAPI : LV3_ERROR_NETWORK
+TradingAPI-->>Application : HL_ERROR_NETWORK
+else Exchange error
+Exchange-->>HTTPClient : 400 Bad Request
+HTTPClient-->>TradingAPI : LV3_ERROR_EXCHANGE
+TradingAPI-->>Application : HL_ERROR_API
+else Success
+Exchange-->>HTTPClient : 200 OK
+HTTPClient-->>TradingAPI : Success
+TradingAPI-->>Application : HL_SUCCESS
+end
+end
 ```
 
-These error codes are also referenced in other header files like `hl_types.h` and `hl_exchange.h`, but the canonical definition resides in `hyperliquid.h`. The error codes provide clear semantic meaning for different failure modes, enabling developers to implement appropriate error handling logic.
+**Diagram sources**
+- [trading_api.c](file://src/trading_api.c#L46-L74)
+- [trading_api.c](file://src/trading_api.c#L110-L182)
 
 **Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L58-L85)
-- [hl_types.h](file://include/hl_types.h)
-- [hl_exchange.h](file://include/hl_exchange.h)
+- [trading_api.c](file://src/trading_api.c#L46-L74)
+- [trading_api.c](file://src/trading_api.c#L110-L182)
+- [websocket.c](file://src/websocket.c#L88-L138)
 
-## Return Value Interpretation
+## Error Handling in Trading Workflows
 
-All API functions in the Hyperliquid C SDK return an `hl_error_t` value that should be checked after each call. A return value of `HL_SUCCESS` (0) indicates the operation completed successfully, while any negative value indicates a specific error condition. Functions that return data typically use output parameters, and the return value solely indicates success or failure.
+### Robust Order Placement
 
-When an error occurs, additional error information may be available in output structures. For example, the `hl_order_result_t` structure contains an `error` field that may contain API-specific error messages when `hl_place_order` fails. This dual-layer error reporting provides both programmatic error codes and human-readable error descriptions.
+Trading workflows implement comprehensive error handling to ensure reliability in volatile market conditions. The `hl_place_order()` function performs parameter validation, signature generation, and HTTP request execution, with appropriate error codes returned for each potential failure point. The implementation uses mutex locking to ensure thread safety during order placement.
+
+### Order Management Operations
+
+The `hl_edit_order()` function demonstrates a sophisticated error handling pattern by implementing order modification as a cancel-then-create sequence. This approach handles partial failures gracefully: if the cancellation succeeds but creation fails, the error from the creation step is propagated, leaving the application responsible for handling the orphaned cancellation. The function returns the first error encountered, ensuring that callers are aware of failure conditions.
+
+### Retry Strategies for Transient Failures
+
+While explicit retry logic is not implemented in the core functions, the error code system enables applications to implement appropriate retry strategies. Transient failures such as `HL_ERROR_NETWORK`, `HL_ERROR_TIMEOUT`, and `HL_ERROR_API` should trigger exponential backoff retry mechanisms in client applications. The SDK's thread-safe design allows retry operations to be safely executed from background threads without corrupting client state.
+
+```mermaid
+flowchart TD
+Start([Order Placement]) --> Validate["Validate Parameters"]
+Validate --> InputValid{"Valid?"}
+InputValid --> |No| ReturnInvalid["Return HL_ERROR_INVALID_PARAMS"]
+InputValid --> |Yes| AcquireLock["Acquire Client Mutex"]
+AcquireLock --> BuildOrder["Build Order Structure"]
+BuildOrder --> SignOrder["Generate Signature"]
+SignOrder --> SignValid{"Signature OK?"}
+SignValid --> |No| ReturnSignature["Return HL_ERROR_SIGNATURE"]
+SignValid --> |Yes| MakeRequest["Make HTTP Request"]
+MakeRequest --> RequestSuccess{"Request Successful?"}
+RequestSuccess --> |No| CheckError["Check Error Type"]
+CheckError --> NetworkError{"Network/Timeout?"}
+NetworkError --> |Yes| SuggestRetry["Return error with retry recommendation"]
+NetworkError --> |No| ReturnFatal["Return error (no retry)"]
+RequestSuccess --> |Yes| ParseResponse["Parse Exchange Response"]
+ParseResponse --> ResponseValid{"Response Valid?"}
+ResponseValid --> |No| ReturnParse["Return HL_ERROR_PARSE"]
+ResponseValid --> |Yes| ReturnSuccess["Return HL_SUCCESS"]
+ReturnInvalid --> End([Function Exit])
+ReturnSignature --> End
+SuggestRetry --> End
+ReturnFatal --> End
+ReturnParse --> End
+ReturnSuccess --> End
+```
+
+**Diagram sources**
+- [orders.c](file://src/orders.c#L693-L726)
+- [trading_api.c](file://src/trading_api.c#L110-L182)
 
 **Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L276-L278)
-- [trading_api.c](file://src/trading_api.c#L79-L220)
+- [orders.c](file://src/orders.c#L693-L726)
+- [trading_api.c](file://src/trading_api.c#L110-L182)
 
-## Error Checking Patterns
+## Validation vs System Errors
 
-Proper error checking is demonstrated throughout the example applications. The typical pattern involves checking the return value immediately after calling an API function and handling errors appropriately. The `simple_trade.c` example shows this pattern clearly:
+### Validation Errors for Malformed Requests
 
-```c
-hl_error_t err = hl_place_order(client, &order, &result);
-if (err == HL_SUCCESS) {
-    printf("✅ Order placed successfully!\n");
-} else {
-    fprintf(stderr, "❌ Failed to place order: %s\n", hl_error_string(err));
-    if (strlen(result.error) > 0) {
-        fprintf(stderr, "   API Error: %s\n", result.error);
-    }
+Validation errors occur when client-provided parameters fail to meet API requirements. These are typically represented by `HL_ERROR_INVALID_PARAMS` and `HL_ERROR_INVALID_SYMBOL`. The SDK performs extensive input validation before attempting network operations, preventing unnecessary API calls for malformed requests. Parameter validation includes checking for null pointers, invalid string formats, and out-of-range numeric values.
+
+### System Errors for Connectivity Issues
+
+System errors indicate problems with the underlying infrastructure or external services. These include `HL_ERROR_NETWORK`, `HL_ERROR_TIMEOUT`, and `HL_ERROR_API`. Unlike validation errors, system errors often represent transient conditions that may resolve with retry attempts. The distinction between validation and system errors is crucial for implementing appropriate recovery strategies, as validation errors require code changes while system errors may resolve with retry.
+
+The error handling system clearly separates these error categories, enabling applications to implement different logging, alerting, and recovery strategies based on the error type. This separation improves operational visibility and reduces false alerts for transient system issues.
+
+**Section sources**
+- [ARCHITECTURE.md](file://ARCHITECTURE.md#L129-L200)
+- [client.c](file://src/client.c#L142-L183)
+
+## Error Code Reference
+
+```mermaid
+erDiagram
+ERROR_CODES {
+int code PK
+string name UK
+string description
+string category
+string recovery_strategy
+bool retry_advised
 }
 ```
 
-This pattern ensures that errors are caught immediately and provides both the error code and any additional API error message. The `trading_bot.c` example shows more comprehensive error handling with user feedback and continued operation after non-critical errors.
+| Error Code | Value | Category | Meaning | Recovery Recommendations |
+|------------|-------|----------|---------|--------------------------|
+| **HL_SUCCESS** | 0 | Success | Operation completed successfully | No action required |
+| **HL_ERROR_INVALID_PARAMS** | -1 | Validation | Invalid function parameters provided | Validate input parameters before retrying |
+| **HL_ERROR_NETWORK** | -2 | System | Network connectivity failure | Implement exponential backoff retry (3-5 attempts) |
+| **HL_ERROR_API** | -3 | System | Exchange API returned error | Retry with backoff; check exchange status |
+| **HL_ERROR_AUTH** | -4 | Security | Authentication failed | Verify credentials and wallet permissions |
+| **HL_ERROR_INSUFFICIENT_BALANCE** | -5 | Business Logic | Insufficient funds for operation | Check balance and reduce order size |
+| **HL_ERROR_INVALID_SYMBOL** | -6 | Validation | Trading symbol not recognized | Verify symbol format and supported pairs |
+| **HL_ERROR_ORDER_REJECTED** | -7 | Business Logic | Exchange rejected order | Check order parameters and market conditions |
+| **HL_ERROR_SIGNATURE** | -8 | Security | Signature generation or verification failed | Verify private key and timestamp synchronization |
+| **HL_ERROR_MSGPACK** | -9 | Serialization | MessagePack encoding/decoding error | Check data structure integrity |
+| **HL_ERROR_JSON** | -10 | Serialization | JSON parsing or generation failed | Validate JSON structure and formatting |
+| **HL_ERROR_MEMORY** | -11 | System | Memory allocation failure | Reduce memory usage or increase system resources |
+| **HL_ERROR_TIMEOUT** | -12 | System | Operation exceeded timeout threshold | Increase timeout settings; check network quality |
+| **HL_ERROR_NOT_IMPLEMENTED** | -13 | Feature | Requested functionality not available | Check API documentation for alternatives |
+| **HL_ERROR_NOT_FOUND** | -14 | System | Requested resource not found | Verify resource identifier and existence |
+| **HL_ERROR_PARSE** | -15 | Serialization | Response parsing failed | Check API version compatibility |
 
 **Section sources**
-- [simple_trade.c](file://examples/simple_trade.c#L118-L135)
-- [trading_bot.c](file://examples/trading_bot.c#L249-L255)
-
-## Recoverable vs Unrecoverable Errors
-
-The SDK distinguishes between recoverable and unrecoverable errors. Recoverable errors include transient conditions like network issues (`HL_ERROR_NETWORK`), timeouts (`HL_ERROR_TIMEOUT`), and temporary API errors (`HL_ERROR_API`). These errors typically allow the application to retry the operation after a delay.
-
-Unrecoverable errors include permanent conditions like invalid parameters (`HL_ERROR_INVALID_PARAMS`), authentication failures (`HL_ERROR_AUTH`), insufficient balance (`HL_ERROR_INSUFFICIENT_BALANCE`), and invalid symbols (`HL_ERROR_INVALID_SYMBOL`). These errors indicate that the operation cannot succeed without changes to the input parameters or user intervention.
-
-The distinction is important for implementing appropriate retry logic. Recoverable errors may be retried with exponential backoff, while unrecoverable errors should be reported to the user and not retried automatically.
-
-**Section sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L58-L85)
-- [trading_api.c](file://src/trading_api.c#L79-L220)
-
-## Error Logging
-
-The SDK provides basic logging capabilities through the `hl_logger.h` header, which defines simple logging macros. Applications can enable debug logging using `hl_set_debug(true)`, though this function is currently a placeholder and not fully implemented.
-
-The logging system uses standard output and error streams with different severity levels:
-- `HL_LOG_INFO` for informational messages
-- `HL_LOG_WARN` for warnings
-- `HL_LOG_ERROR` for errors
-- `HL_LOG_DEBUG` for debug messages (only when DEBUG is defined)
-
-Applications should use these macros consistently for logging, and can supplement them with their own logging infrastructure. The example applications demonstrate proper error reporting using `fprintf` to stderr for error conditions.
-
-**Section sources**
-- [hl_logger.h](file://include/hl_logger.h#L0-L36)
-- [client.c](file://src/client.c#L148-L151)
-
-## Common Error Scenarios
-
-Several common error scenarios are addressed in the SDK and example applications:
-
-**Connection timeouts**: Handled by the underlying HTTP client with `HL_ERROR_TIMEOUT`. The `hl_set_timeout` function allows clients to configure the timeout duration.
-
-**Invalid signatures**: Occur when the private key cannot be used to sign messages properly, resulting in `HL_ERROR_SIGNATURE`. This typically indicates a problem with the private key format or cryptographic operations.
-
-**Insufficient balance**: Returns `HL_ERROR_INSUFFICIENT_BALANCE` when an order cannot be placed due to inadequate funds. The `simple_trade.c` example checks the balance before placing an order to avoid this error.
-
-**Authentication failures**: Return `HL_ERROR_AUTH` when the wallet address or private key are invalid or when the signature verification fails on the server side.
-
-**Rate limiting**: While not explicitly defined as a separate error code, rate limiting by the exchange API would typically result in `HL_ERROR_API` or `HL_ERROR_NETWORK` with appropriate messages in the response.
-
-The example applications demonstrate how to handle these scenarios gracefully, providing user feedback and continuing operation where possible.
-
-**Section sources**
-- [simple_trade.c](file://examples/simple_trade.c#L85-L105)
-- [trading_api.c](file://src/trading_api.c#L79-L220)
-- [hyperliquid.h](file://include/hyperliquid.h#L58-L85)
-
-## Retry Strategies
-
-For transient errors, the recommended strategy is exponential backoff with jitter. While the SDK does not implement automatic retry logic, applications should implement this pattern for recoverable errors like network issues and timeouts.
-
-A typical retry strategy involves:
-1. Detecting recoverable errors (network, timeout, API errors)
-2. Waiting a base delay (e.g., 1 second) before retrying
-3. Doubling the delay after each failed attempt
-4. Adding random jitter to avoid thundering herd problems
-5. Limiting the maximum number of retries or total retry time
-
-The `trading_bot.c` example demonstrates a simple retry-capable design with its main loop, though it does not implement exponential backoff explicitly. Applications should implement retry logic around critical operations, especially order placement and balance queries, while respecting the exchange's rate limits.
-
-**Section sources**
-- [trading_bot.c](file://examples/trading_bot.c#L300-L320)
-- [simple_trade.c](file://examples/simple_trade.c#L118-L135)
+- [hl_error.h](file://include/hl_error.h#L15-L35)
+- [client.c](file://src/client.c#L142-L183)

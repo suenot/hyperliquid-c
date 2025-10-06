@@ -2,250 +2,225 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [ohlcv.c](file://src/ohlcv.c)
 - [hl_ohlcv.h](file://include/hl_ohlcv.h)
-- [simple_ohlcv.c](file://examples/simple_ohlcv.c)
+- [ohlcv.c](file://src/ohlcv.c)
 - [hl_markets.h](file://include/hl_markets.h)
-- [hl_http.h](file://include/hl_http.h)
-- [hl_ticker.h](file://include/hl_ticker.h)
+- [hl_types.h](file://include/hl_types.h)
+- [simple_ohlcv.c](file://examples/simple_ohlcv.c)
 </cite>
 
 ## Table of Contents
 1. [Introduction](#introduction)
-2. [Core Data Structure](#core-data-structure)
-3. [Function Parameters](#function-parameters)
-4. [Implementation Workflow](#implementation-workflow)
-5. [Usage Example](#usage-example)
-6. [Common Pitfalls](#common-pitfalls)
-7. [Rate Limiting and Caching](#rate-limiting-and-caching)
-8. [Data Synchronization](#data-synchronization)
-9. [Conclusion](#conclusion)
+2. [Function Parameters](#function-parameters)
+3. [Data Structures](#data-structures)
+4. [Timeframe Support](#timeframe-support)
+5. [Market Type Differences](#market-type-differences)
+6. [Memory Management](#memory-management)
+7. [Usage Examples](#usage-examples)
+8. [Pagination and Data Retrieval](#pagination-and-data-retrieval)
+9. [Common Issues and Solutions](#common-issues-and-solutions)
 
 ## Introduction
-
-The OHLCV (Open, High, Low, Close, Volume) candlestick data retrieval feature provides historical price and volume information for technical analysis and trading strategies. This documentation explains the `hl_fetch_ohlcv` function, its parameters, data structures, implementation details, and best practices for usage in charting applications.
-
-**Section sources**
-- [hl_ohlcv.h](file://include/hl_ohlcv.h#L1-L20)
-- [ohlcv.c](file://src/ohlcv.c#L1-L20)
-
-## Core Data Structure
-
-The `hl_ohlcv_t` structure represents a single candlestick with timestamp, price levels, and volume information. Each candle contains six key data points that form the basis of technical analysis.
-
-```mermaid
-classDiagram
-class hl_ohlcv_t {
-+uint64_t timestamp
-+double open
-+double high
-+double low
-+double close
-+double volume
-}
-class hl_ohlcvs_t {
-+hl_ohlcv_t* candles
-+size_t count
-+char symbol[64]
-+char timeframe[16]
-}
-hl_ohlcvs_t --> hl_ohlcv_t : "contains"
-```
-
-**Diagram sources**
-- [hl_ohlcv.h](file://include/hl_ohlcv.h#L25-L32)
-- [hl_ohlcv.h](file://include/hl_ohlcv.h#L45-L52)
-
-The `hl_ohlcvs_t` structure wraps an array of `hl_ohlcv_t` candles with metadata including symbol, timeframe, and count. This collection structure enables efficient memory management and data access patterns.
+The OHLCV (Open, High, Low, Close, Volume) candle data retrieval system provides historical price and volume information for technical analysis and trading strategies. The `hl_fetch_ohlcv()` function enables developers to retrieve candlestick data with flexible time range and limit controls. This documentation covers the complete functionality of the OHLCV data retrieval system, including parameter details, data structures, memory management, and practical usage patterns.
 
 **Section sources**
-- [hl_ohlcv.h](file://include/hl_ohlcv.h#L25-L52)
+- [hl_ohlcv.h](file://include/hl_ohlcv.h#L83-L85)
+- [ohlcv.c](file://src/ohlcv.c#L136-L283)
 
 ## Function Parameters
+The `hl_fetch_ohlcv()` function accepts several parameters to control data retrieval:
 
-The `hl_fetch_ohlcv` function accepts several parameters to customize data retrieval:
-
-- **client**: Client instance for API authentication and configuration
-- **symbol**: Trading symbol in unified format (e.g., "BTC/USDC:USDC")
-- **timeframe**: Candle interval specified as string (e.g., "1m", "5m", "1h")
+- **client**: Client instance for API communication
+- **symbol**: Market symbol in format "BASE/QUOTE:SETTLEMENT" (e.g., "BTC/USDC:USDC")
+- **timeframe**: Candle timeframe (e.g., "1m", "1h", "1d")
 - **since**: Start timestamp in milliseconds (optional)
 - **limit**: Maximum number of candles to return (optional)
 - **until**: End timestamp in milliseconds (optional)
-- **ohlcvs**: Output parameter for returned candle data
+- **ohlcvs**: Output structure for retrieved OHLCV data
 
-The function supports multiple timeframe constants defined in the header file, including HL_TIMEFRAME_1M, HL_TIMEFRAME_5M, HL_TIMEFRAME_1H, and others.
+When `since` is not provided, the function calculates the start time based on the `limit` parameter. If neither `since` nor `limit` is specified, it defaults to the last 24 hours of data. The `until` parameter defaults to the current time if not provided.
+
+**Section sources**
+- [hl_ohlcv.h](file://include/hl_ohlcv.h#L83-L85)
+- [ohlcv.c](file://src/ohlcv.c#L136-L283)
+
+## Data Structures
+The OHLCV system uses two primary data structures:
+
+### hl_ohlcv_t Structure
+Represents a single OHLCV candle with the following fields:
+- **timestamp**: Candle open timestamp in milliseconds
+- **open**: Opening price
+- **high**: Highest price during the period
+- **low**: Lowest price during the period
+- **close**: Closing price
+- **volume**: Trading volume
+
+### hl_ohlcvs_t Structure
+Represents a collection of OHLCV candles with metadata:
+- **candles**: Array of hl_ohlcv_t structures
+- **count**: Number of candles in the array
+- **symbol**: Trading symbol
+- **timeframe**: Timeframe of the candles
+
+**Section sources**
+- [hl_ohlcv.h](file://include/hl_ohlcv.h#L22-L23)
+- [hl_ohlcv.h](file://include/hl_ohlcv.h#L28-L47)
+- [hl_ohlcv.h](file://include/hl_ohlcv.h#L52-L64)
+
+## Timeframe Support
+The system supports multiple timeframe intervals for candle data:
 
 ```mermaid
 flowchart TD
-A["hl_fetch_ohlcv()"] --> B["Validate parameters"]
-B --> C["Validate timeframe"]
-C --> D["Fetch markets data"]
-D --> E["Get asset ID by symbol"]
-E --> F["Build API request"]
-F --> G["Make HTTP POST request"]
-G --> H["Parse JSON response"]
-H --> I["Allocate memory for candles"]
-I --> J["Parse individual candles"]
-J --> K["Return populated hl_ohlcvs_t"]
+A["Supported Timeframes"] --> B["Minute Intervals"]
+A --> C["Hourly Intervals"]
+A --> D["Daily Intervals"]
+A --> E["Weekly/Monthly"]
+B --> B1["1m"]
+B --> B2["3m"]
+B --> B3["5m"]
+B --> B4["15m"]
+B --> B5["30m"]
+C --> C1["1h"]
+C --> C2["2h"]
+C --> C3["4h"]
+C --> C4["8h"]
+C --> C5["12h"]
+D --> D1["1d"]
+D --> D2["3d"]
+E --> E1["1w"]
+E --> E2["1M"]
 ```
 
 **Diagram sources**
-- [ohlcv.c](file://src/ohlcv.c#L150-L300)
-- [hl_ohlcv.h](file://include/hl_ohlcv.h#L72-L88)
+- [hl_ohlcv.h](file://include/hl_ohlcv.h#L67-L81)
+
+## Market Type Differences
+The OHLCV retrieval system handles spot and swap markets differently:
+
+### Request Construction
+For **swap markets**, the request uses the coin name (baseName):
+```json
+{"type":"candleSnapshot","req":{"coin":"BTC","interval":"1m","startTime":1234567890000,"endTime":1234567950000}}
+```
+
+For **spot markets**, the request uses the asset ID:
+```json
+{"type":"candleSnapshot","req":{"coin":"1","interval":"1m","startTime":1234567890000,"endTime":1234567950000}}
+```
+
+The system automatically determines the market type by querying the market information and constructs the appropriate request format.
 
 **Section sources**
-- [hl_ohlcv.h](file://include/hl_ohlcv.h#L72-L88)
-- [ohlcv.c](file://src/ohlcv.c#L150-L300)
+- [ohlcv.c](file://src/ohlcv.c#L220-L235)
+- [hl_markets.h](file://include/hl_markets.h#L113-L113)
 
-## Implementation Workflow
+## Memory Management
+Proper memory management is critical when working with OHLCV data:
 
-The OHLCV retrieval process follows a systematic workflow involving market data lookup, HTTP communication, JSON parsing, and memory management.
+### Memory Allocation
+The `hl_fetch_ohlcv()` function allocates memory for the candles array using `calloc()`. The caller is responsible for freeing this memory.
 
-### Market Information Lookup
+### Memory Deallocation
+Use `hl_ohlcvs_free()` to properly free OHLCV data:
+- Frees the candles array
+- Resets count to zero
+- Clears symbol and timeframe strings
 
-Before making the OHLCV request, the function retrieves market information to determine the asset ID and market type (swap or spot). This requires calling `hl_fetch_markets` to get all available markets, then using `hl_get_asset_id` and `hl_get_market` to find the specific market details.
+### Helper Functions
+The system provides utility functions for safe memory operations:
+- `hl_ohlcvs_free()`: Safely frees OHLCV data and nulls pointers
+- Automatic cleanup in error conditions within `hl_fetch_ohlcv()`
 
+**Section sources**
+- [ohlcv.c](file://src/ohlcv.c#L288-L298)
+- [hl_ohlcv.h](file://include/hl_ohlcv.h#L92-L92)
+
+## Usage Examples
+The OHLCV system supports various use cases for trading and analysis:
+
+### Backtesting Data Preparation
 ```mermaid
 sequenceDiagram
-participant Client
-participant OHLCV
-participant Markets
-participant HTTP
-Client->>OHLCV : hl_fetch_ohlcv()
-OHLCV->>Markets : hl_fetch_markets()
-Markets->>HTTP : GET /info
-HTTP-->>Markets : Market data
-Markets-->>OHLCV : hl_markets_t
-OHLCV->>OHLCV : hl_get_asset_id()
-OHLCV->>OHLCV : hl_get_market()
-OHLCV->>HTTP : POST /info with candle request
-HTTP-->>OHLCV : JSON response
-OHLCV->>OHLCV : Parse candles
-OHLCV-->>Client : hl_ohlcvs_t
+participant Application
+participant hl_fetch_ohlcv
+participant API
+participant hl_ohlcvs_free
+Application->>hl_fetch_ohlcv : Request historical data
+hl_fetch_ohlcv->>API : Send candleSnapshot request
+API-->>hl_fetch_ohlcv : Return candle data
+hl_fetch_ohlcv-->>Application : Populate ohlcvs structure
+Application->>Application : Process for backtesting
+Application->>hl_ohlcvs_free : Clean up memory
 ```
 
 **Diagram sources**
-- [ohlcv.c](file://src/ohlcv.c#L190-L250)
-- [hl_markets.h](file://include/hl_markets.h#L83-L110)
+- [simple_ohlcv.c](file://examples/simple_ohlcv.c#L75-L191)
+- [ohlcv.c](file://src/ohlcv.c#L136-L283)
 
-### HTTP Request and Response Processing
+### Charting and Technical Indicators
+The system includes built-in functions for technical analysis:
+- **SMA Calculation**: `hl_ohlcvs_calculate_sma()` computes simple moving averages
+- **Range Analysis**: `hl_ohlcvs_highest_high()` and `hl_ohlcvs_lowest_low()` find price extremes
+- **Candle Access**: `hl_ohlcvs_get_candle()` and `hl_ohlcvs_get_latest()` provide indexed access
 
-The implementation makes an HTTP POST request to the `/info` endpoint with a JSON payload containing the candle snapshot request. The request body format differs between swap and spot markets, using either the coin name or asset ID.
-
-After receiving the response, the function parses the JSON array using cJSON, validates the structure, and extracts individual candle data. Memory is dynamically allocated for the candle array using calloc, with proper error handling for memory allocation failures.
-
-**Section sources**
-- [ohlcv.c](file://src/ohlcv.c#L250-L300)
-- [hl_http.h](file://include/hl_http.h#L97-L108)
-
-## Usage Example
-
-The `simple_ohlcv.c` example demonstrates proper configuration, invocation, and iteration over returned candle data. The example shows how to create a client, fetch OHLCV data for multiple symbols and timeframes, and analyze the results.
-
-```mermaid
-flowchart TD
-A["main()"] --> B["Create client"]
-B --> C["Define test cases"]
-C --> D["Loop through test cases"]
-D --> E["Call hl_fetch_ohlcv()"]
-E --> F["Check error status"]
-F --> G["Analyze candles"]
-G --> H["Call hl_ohlcvs_free()"]
-H --> I["Next test case"]
-I --> J["Time range filtering"]
-J --> K["Cleanup client"]
-```
-
-**Diagram sources**
-- [simple_ohlcv.c](file://examples/simple_ohlcv.c#L100-L150)
-
-The example includes comprehensive error handling and demonstrates the use of utility functions like `hl_ohlcvs_get_latest`, `hl_ohlcvs_calculate_sma`, and `hl_ohlcvs_highest_high` for technical analysis.
+These functions enable immediate technical analysis without additional processing.
 
 **Section sources**
-- [simple_ohlcv.c](file://examples/simple_ohlcv.c#L1-L193)
+- [hl_ohlcv.h](file://include/hl_ohlcv.h#L111-L141)
+- [ohlcv.c](file://src/ohlcv.c#L313-L394)
 
-## Common Pitfalls
+## Pagination and Data Retrieval
+Effective pagination strategies are essential for handling large datasets:
 
-Several common issues can occur when working with OHLCV data retrieval:
+### Timestamp Normalization
+All timestamps are in milliseconds and follow UTC timezone. The system automatically handles:
+- Current time calculation using `time(NULL) * 1000`
+- Time range validation
+- Proper ordering of candles (oldest to newest)
 
-### Invalid Timeframe Handling
+### Partial Data Handling
+When requesting data across large time ranges:
+- The system limits results based on the `limit` parameter
+- Returns available data even if fewer candles exist
+- Handles edge cases like market inception dates
 
-The function validates timeframes against a predefined list of supported intervals. Using an unsupported timeframe like "2m" or "10m" will result in HL_ERROR_INVALID_PARAMS. Always use the defined constants (HL_TIMEFRAME_1M, HL_TIMEFRAME_5M, etc.) to avoid this issue.
-
-### Out-of-Range Timestamps
-
-When specifying time ranges, ensure that the start time is before the end time and within the exchange's available data history. The API may return empty results for requests outside the valid range.
-
-### Partial Candle Data
-
-The OHLCV endpoint may return incomplete candles if requested near the current time. For accurate technical analysis, consider discarding the most recent candle or supplementing with real-time ticker data.
-
-**Section sources**
-- [ohlcv.c](file://src/ohlcv.c#L100-L150)
-- [simple_ohlcv.c](file://examples/simple_ohlcv.c#L150-L180)
-
-## Rate Limiting and Caching
-
-### Rate Limiting Considerations
-
-Historical data queries should be rate-limited to avoid overwhelming the API. Implement exponential backoff for retry logic and consider the following guidelines:
-
-- Limit requests to 1-2 per second for historical data
-- Use larger timeframes when possible to reduce request frequency
-- Cache results locally to minimize redundant API calls
-
-### Caching Strategies
-
-For charting applications, implement a multi-level caching strategy:
-
-1. **Memory Cache**: Store recently fetched data in memory for quick access
-2. **Disk Cache**: Persist frequently accessed data to disk for application restarts
-3. **Cache Expiration**: Implement TTL-based expiration for stale data
-4. **Cache Invalidation**: Clear cache when new real-time data arrives
-
-The `hl_ohlcvs_free` function must be called to properly release allocated memory and prevent memory leaks.
+### Pagination Strategy
+For retrieving large historical datasets:
+1. Start with a known `since` timestamp
+2. Use `limit` to control response size
+3. Use the last candle's timestamp as the next `since` value
+4. Repeat until desired data range is covered
 
 **Section sources**
-- [ohlcv.c](file://src/ohlcv.c#L300-L310)
-- [simple_ohlcv.c](file://examples/simple_ohlcv.c#L180-L193)
+- [ohlcv.c](file://src/ohlcv.c#L185-L198)
+- [ohlcv.c](file://src/ohlcv.c#L245-L255)
 
-## Data Synchronization
+## Common Issues and Solutions
+### Missing Data Points
+Common causes and solutions:
+- **Testnet Limitations**: Testnet may not have historical OHLCV data; use mainnet for real data
+- **Invalid Timeframes**: Ensure timeframe matches supported values
+- **Symbol Errors**: Verify symbol format and market availability
 
-### Real-Time Data Integration
+### Rate Limiting
+During bulk requests:
+- Implement request throttling
+- Use larger timeframes for historical data
+- Consider caching strategies
+- Monitor API response codes for rate limit warnings
 
-To synchronize OHLCV data with real-time updates, combine historical candle data with streaming ticker or order book data:
+### Error Handling
+The system returns specific error codes:
+- `HL_ERROR_INVALID_PARAMS`: Invalid input parameters
+- `HL_ERROR_NETWORK`: Network communication failure
+- `HL_ERROR_API`: API returned non-200 status
+- `HL_ERROR_PARSE`: Response parsing failure
+- `HL_ERROR_MEMORY`: Memory allocation failure
 
-```mermaid
-sequenceDiagram
-participant Chart
-participant OHLCV
-participant Ticker
-participant WebSocket
-OHLCV->>Chart : Historical candles
-WebSocket->>Ticker : Real-time price updates
-Ticker->>Chart : Current price
-Chart->>Chart : Update current candle
-```
-
-**Diagram sources**
-- [hl_ticker.h](file://include/hl_ticker.h#L72-L72)
-- [hl_ohlcv.h](file://include/hl_ohlcv.h#L97-L97)
-
-Use the `hl_fetch_ticker` function to get current market prices and update the active candle's high, low, and close values in real-time.
-
-### Best Practices
-
-1. **Timestamp Alignment**: Ensure candle timestamps align with the specified timeframe boundaries
-2. **Data Consistency**: Verify that the last historical candle connects properly with the first real-time update
-3. **Gap Handling**: Detect and handle gaps in data due to exchange downtime or network issues
-4. **Update Frequency**: Refresh historical data periodically to capture any corrections or adjustments
+Always check the return value and handle errors appropriately.
 
 **Section sources**
-- [hl_ticker.h](file://include/hl_ticker.h#L72-L72)
-- [hl_ohlcv.h](file://include/hl_ohlcv.h#L97-L138)
-
-## Conclusion
-
-The OHLCV candlestick data retrieval feature provides a robust foundation for technical analysis and charting applications. By understanding the function parameters, data structures, and implementation details, developers can effectively integrate historical price data into their trading strategies. Proper error handling, rate limiting, caching, and real-time data synchronization are essential for building reliable and performant applications.
-
-The combination of the `hl_fetch_ohlcv` function with supporting utilities for technical analysis creates a comprehensive toolkit for working with candlestick data. Following the demonstrated patterns and best practices will ensure efficient and accurate data retrieval and processing.
+- [hl_error.h](file://include/hl_error.h#L15-L37)
+- [ohlcv.c](file://src/ohlcv.c#L136-L283)

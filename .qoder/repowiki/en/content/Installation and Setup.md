@@ -2,190 +2,224 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [Makefile](file://Makefile)
-- [fix_includes.sh](file://fix_includes.sh)
 - [README.md](file://README.md)
+- [Makefile](file://Makefile)
+- [QUICKSTART.md](file://QUICKSTART.md)
+- [simple_balance.c](file://examples/simple_balance.c)
+- [simple_test.c](file://tests/simple_test.c)
 </cite>
 
 ## Table of Contents
 1. [Prerequisites](#prerequisites)
-2. [Build Process](#build-process)
-3. [External Dependencies](#external-dependencies)
-4. [Library Installation](#library-installation)
-5. [Linking with Client Applications](#linking-with-client-applications)
-6. [Cross-Compilation](#cross-compilation)
-7. [Integration with CMake](#integration-with-cmake)
-8. [Installation Verification](#installation-verification)
-9. [Header File Management](#header-file-management)
-10. [Troubleshooting](#troubleshooting)
+2. [Platform-Specific Installation](#platform-specific-installation)
+3. [Building the Library](#building-the-library)
+4. [Environment Configuration](#environment-configuration)
+5. [Linking and Usage](#linking-and-usage)
+6. [Troubleshooting Common Issues](#troubleshooting-common-issues)
+7. [Verification and Testing](#verification-and-testing)
+8. [Configuration Options](#configuration-options)
 
 ## Prerequisites
 
-Before building the Hyperliquid C SDK, ensure your system has the following prerequisites installed:
+Before installing the hyperliquid-c library, ensure your system has the following dependencies:
 
-- **C Compiler**: GCC or Clang with C11 support
+- **C Compiler**: GCC or Clang with C99/C11 support
 - **Build System**: GNU Make
-- **Development Tools**: Standard build tools (autoconf, automake, libtool)
-- **Package Manager**: apt (Ubuntu/Debian) or Homebrew (macOS)
+- **Required Libraries**:
+  - `libcurl` - HTTP client library
+  - `cJSON` - JSON parsing library
+  - `libsecp256k1` - Elliptic curve cryptography for EIP-712 signing
+  - `msgpack-c` - MessagePack serialization
+  - `pthread` - POSIX threads for concurrency
+  - `uuid-dev` - UUID generation (Linux) or `ossp-uuid` (macOS)
 
-The SDK requires specific external libraries that will be detailed in the External Dependencies section.
-
-**Section sources**
-- [README.md](file://README.md#L216-L230)
-
-## Build Process
-
-The Hyperliquid C SDK uses a comprehensive Makefile-based build system that supports both static and shared library compilation. The build process is controlled through various Make targets that handle different aspects of the build workflow.
-
-### Static and Shared Library Compilation
-
-The default build target compiles both static and shared library variants of the SDK:
-
-```bash
-# Build both static and shared libraries (default)
-make
-
-# Clean build artifacts before building
-make clean all
-```
-
-The Makefile defines the following key variables for compilation:
-- `CC = gcc`: Compiler used for compilation
-- `CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -O3 -fPIC`: Compilation flags
-- `AR = ar`: Archiver for static libraries
-- `LIBS = -lcurl -lcjson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread`: Required external libraries
-
-The build system automatically compiles all source files from the `src/` directory and places object files in the `build/obj/` directory before creating the final libraries in `build/lib/`.
-
-### Debug Build
-
-For development and debugging purposes, a debug build target is available that includes debug symbols and sanitizers:
-
-```bash
-# Build with debug symbols and sanitizers
-make debug
-```
-
-This target modifies the `CFLAGS` to include `-g -O0 -DDEBUG` and enables AddressSanitizer and UndefinedBehaviorSanitizer for comprehensive runtime error detection.
+These dependencies are essential for the library's core functionality, including HTTP communication, cryptographic operations, data serialization, and thread safety.
 
 **Section sources**
-- [Makefile](file://Makefile#L10-L216)
+- [README.md](file://README.md#L230-L235)
+- [QUICKSTART.md](file://QUICKSTART.md#L10-L25)
 
-## External Dependencies
+## Platform-Specific Installation
 
-The Hyperliquid C SDK depends on several external libraries that must be installed on your system before compilation. These dependencies provide essential functionality for HTTP communication, JSON parsing, cryptographic operations, and message serialization.
+### Ubuntu/Debian
 
-### Linux Installation (Ubuntu/Debian)
-
-On Ubuntu or Debian-based systems, install the required dependencies using apt:
+Install the required dependencies using APT package manager:
 
 ```bash
-# Install required development libraries
 sudo apt-get update
 sudo apt-get install -y \
     libcurl4-openssl-dev \
     libcjson-dev \
-    libssl-dev \
-    libmsgpack-dev \
     libsecp256k1-dev \
-    uuid-dev
+    libmsgpack-dev \
+    uuid-dev \
+    build-essential
 ```
 
-### macOS Installation (Homebrew)
+The `build-essential` package includes GCC, Make, and other essential build tools. The development packages (ending in `-dev`) provide header files needed for compilation.
 
-On macOS with Homebrew installed, use the following commands to install dependencies:
+### macOS
+
+Using Homebrew, install the dependencies:
 
 ```bash
-# Install required libraries via Homebrew
-brew install curl
-brew install jansson
-brew install openssl@1.1
-brew install msgpack
-brew install libsecp256k1
-brew install ossp-uuid
+brew install curl cjson libsecp256k1 msgpack ossp-uuid
 ```
 
-Note that on macOS, the Makefile includes `-I/opt/homebrew/include` in the `INCLUDES` variable to ensure the compiler can find headers installed by Homebrew on Apple Silicon Macs.
+Note that on macOS, the UUID library is provided by `ossp-uuid` rather than the Linux `uuid-dev` package.
 
-**Section sources**
-- [README.md](file://README.md#L216-L230)
-- [Makefile](file://Makefile#L13)
+### Other Unix-like Systems
 
-## Library Installation
-
-The SDK provides a convenient installation target that copies the compiled libraries and header files to system directories, making them available for use by other applications.
-
-### Installing the Library
-
-After building the libraries, install them system-wide using:
-
+#### Arch Linux
 ```bash
-# Build and install the library
-make install
+sudo pacman -S curl cjson libsecp256k1 msgpack-c base-devel
 ```
 
-This command performs the following actions:
-1. Builds both static and shared libraries if they haven't been built
-2. Copies `libhyperliquid.a` and `libhyperliquid.so` to `/usr/local/lib/`
-3. Copies all header files from the `include/` directory to `/usr/local/include/`
-4. Runs `ldconfig` to update the shared library cache
-
-### Uninstalling the Library
-
-To remove the installed library files:
-
+#### Fedora/RHEL
 ```bash
-# Remove installed library files
-make uninstall
+sudo dnf install curl-devel json-c-devel libsecp256k1-devel msgpack-devel libuuid-devel gcc make
 ```
 
-This command removes the library files from `/usr/local/lib/` and header files from `/usr/local/include/`.
-
-### Custom Installation Directory
-
-For installations to custom directories, modify the Makefile or use environment variables:
-
+#### Alpine Linux
 ```bash
-# Example: Install to a custom prefix
-sudo cp build/lib/libhyperliquid.* /opt/hyperliquid/lib/
-sudo cp include/*.h /opt/hyperliquid/include/
+apk add curl-dev json-c-dev libsecp256k1-dev msgpack-dev util-linux-dev gcc make musl-dev
 ```
 
 **Section sources**
-- [Makefile](file://Makefile#L134-L145)
+- [README.md](file://README.md#L230-L245)
+- [QUICKSTART.md](file://QUICKSTART.md#L10-L25)
 
-## Linking with Client Applications
+## Building the Library
 
-To use the Hyperliquid C SDK in your applications, you need to link against the compiled libraries and include the appropriate header files.
+The hyperliquid-c library uses a standard Makefile-based build system with multiple targets for different build scenarios.
 
-### Compiler and Linker Flags
+### Basic Build
 
-When compiling client applications, use the following flags:
+Clone the repository and build the library:
 
 ```bash
-# Compilation flags for including SDK headers
--I/usr/local/include
-
-# Linking flags for static library
--L/usr/local/lib -lhyperliquid -lcurl -lcjson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread
-
-# Or for shared library (same linking flags)
--L/usr/local/lib -lhyperliquid -lcurl -lcjson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread
+git clone https://github.com/suenot/hyperliquid-c.git
+cd hyperliquid-c
+make
 ```
 
-### Example Compilation
+This default target builds both static and shared libraries:
+- Static library: `build/lib/libhyperliquid.a`
+- Shared library: `build/lib/libhyperliquid.so` (Linux) or `build/lib/libhyperliquid.dll` (Windows)
 
-Here's an example of compiling a client application that uses the SDK:
+### Build Targets
+
+The Makefile provides several targets for different purposes:
 
 ```bash
-# Compile a client application
-gcc -std=c11 -O3 \
-    -I/usr/local/include \
-    client_app.c \
-    -o client_app \
-    -L/usr/local/lib \
+make all           # Build static and shared libraries (default)
+make debug         # Build with debug symbols and sanitizers
+make examples      # Build example programs
+make tests         # Build test executables
+make test          # Build and run all tests
+make install       # Install to /usr/local
+make clean         # Remove build artifacts
+```
+
+### Debug Build
+
+For development and debugging, use the debug target which includes additional flags:
+
+```bash
+make clean debug
+```
+
+This enables:
+- Debug symbols (`-g`)
+- AddressSanitizer and UndefinedBehaviorSanitizer
+- Debug assertions
+- No optimization (`-O0`)
+
+### Building Examples
+
+The library includes several example programs demonstrating various use cases:
+
+```bash
+make examples
+```
+
+This compiles all examples in the `examples/` directory to the `build/bin/` directory. Examples include:
+- `simple_balance.c` - Account balance retrieval
+- `simple_trade.c` - Basic trading operations
+- `websocket_demo.c` - WebSocket streaming
+
+**Section sources**
+- [Makefile](file://Makefile#L1-L227)
+- [README.md](file://README.md#L247-L252)
+
+## Environment Configuration
+
+### Environment Variables
+
+The library supports environment variables for configuration:
+
+```bash
+# Testnet credentials
+export HYPERLIQUID_TESTNET_WALLET_ADDRESS="0xYourWalletAddress"
+export HYPERLIQUID_TESTNET_PRIVATE_KEY="your64charprivatekey"
+
+# Mainnet credentials
+export HYPERLIQUID_MAINNET_WALLET_ADDRESS="0xYourWalletAddress" 
+export HYPERLIQUID_MAINNET_PRIVATE_KEY="your64charprivatekey"
+```
+
+These variables are used when creating a client instance without explicitly passing credentials.
+
+### Client Configuration
+
+When creating a client programmatically, you can specify configuration options:
+
+```c
+hl_client_t* client = hl_client_create(
+    wallet_address,
+    private_key,
+    true  // testnet flag
+);
+```
+
+The third parameter determines whether to use the testnet (`true`) or mainnet (`false`).
+
+**Section sources**
+- [QUICKSTART.md](file://QUICKSTART.md#L55-L65)
+- [README.md](file://README.md#L550-L565)
+
+## Linking and Usage
+
+### Linking the Library
+
+When compiling applications that use hyperliquid-c, link against the required libraries:
+
+```bash
+gcc -o my_app my_app.c \
+    -I hyperliquid-c/include \
+    -L hyperliquid-c/build/lib \
     -lhyperliquid \
-    -lcurl -lcjson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread
+    -lcurl -lcjson -lsecp256k1 -lmsgpackc -lpthread -luuid \
+    -lssl -lcrypto
+```
+
+### Installing System-Wide
+
+To install the library system-wide for easier linking:
+
+```bash
+sudo make install
+```
+
+This copies:
+- Header files to `/usr/local/include/`
+- Libraries to `/usr/local/lib/`
+- Updates the dynamic linker cache
+
+After installation, you can link more simply:
+
+```bash
+gcc -o my_app my_app.c -lhyperliquid -lcurl -lcjson -lsecp256k1 -lmsgpackc
 ```
 
 ### Basic Usage Example
@@ -194,23 +228,21 @@ gcc -std=c11 -O3 \
 #include "hyperliquid.h"
 
 int main() {
-    // Create client instance
+    // Create client with testnet
     hl_client_t* client = hl_client_create(
-        "your_wallet_address",
-        "your_private_key",
-        true  // testnet
+        "0xYourWalletAddress",
+        "your64charprivatekey",
+        true
     );
-    
+
     if (!client) {
+        printf("Failed to create client\n");
         return 1;
     }
-    
-    // Use SDK functions
-    hl_balance_t balance = {0};
-    if (hl_fetch_balance(client, HL_ACCOUNT_PERPETUAL, &balance) == HL_SUCCESS) {
-        printf("Account value: %.2f USDC\n", balance.account_value);
-    }
-    
+
+    // Use the client for API calls
+    // ...
+
     // Cleanup
     hl_client_destroy(client);
     return 0;
@@ -218,357 +250,143 @@ int main() {
 ```
 
 **Section sources**
-- [Makefile](file://Makefile#L13)
-- [README.md](file://README.md#L276-L288)
+- [QUICKSTART.md](file://QUICKSTART.md#L100-L130)
+- [Makefile](file://Makefile#L10-L15)
 
-## Cross-Compilation
-
-The Hyperliquid C SDK can be cross-compiled for different architectures and platforms by modifying the compiler and flags in the Makefile.
-
-### Cross-Compilation Setup
-
-To cross-compile, modify the `CC` variable to point to the cross-compiler:
-
-```bash
-# Example: Cross-compiling for ARM64
-make CC=aarch64-linux-gnu-gcc
-
-# Example: Cross-compiling for Windows using MinGW
-make CC=x86_64-w64-mingw32-gcc
-```
-
-### Architecture-Specific Considerations
-
-When cross-compiling, ensure that the required dependencies are available for the target architecture. You may need to:
-
-1. Install cross-compilation toolchains
-2. Build dependencies for the target architecture
-3. Set appropriate include and library paths
-
-```bash
-# Example: Cross-compiling with custom paths
-make CC=aarch64-linux-gnu-gcc \
-     CFLAGS="-std=c11 -O3 -fPIC -I/path/to/cross/include" \
-     LIBS="-L/path/to/cross/lib -lcurl -lcjson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread"
-```
-
-### Target Platform Examples
-
-#### Windows (MinGW)
-```bash
-# Install MinGW dependencies on Ubuntu
-sudo apt-get install mingw-w64
-
-# Cross-compile for Windows
-make CC=x86_64-w64-mingw32-gcc \
-     AR=x86_64-w64-mingw32-ar \
-     LIBS="-lcurl -ljansson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread"
-```
-
-#### ARM64 (Linux)
-```bash
-# Cross-compile for ARM64
-make CC=aarch64-linux-gnu-gcc \
-     AR=aarch64-linux-gnu-ar \
-     CFLAGS="-std=c11 -O3 -fPIC -I/usr/aarch64-linux-gnu/include" \
-     LIBS="-L/usr/aarch64-linux-gnu/lib -lcurl -lcjson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread"
-```
-
-**Section sources**
-- [Makefile](file://Makefile#L10-L13)
-
-## Integration with CMake
-
-The Hyperliquid C SDK can be integrated into projects using CMake as the build system through several approaches.
-
-### Using find_package
-
-If the SDK is installed system-wide, use `find_package` in your CMakeLists.txt:
-
-```cmake
-# Find the Hyperliquid package
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(HYPERLIQUID REQUIRED hyperliquid)
-
-# Include directories
-include_directories(${HYPERLIQUID_INCLUDE_DIRS})
-
-# Link libraries
-target_link_libraries(your_target ${HYPERLIQUID_LIBRARIES})
-target_link_directories(your_target ${HYPERLIQUID_LIBRARY_DIRS})
-```
-
-### Manual Integration
-
-For manual integration without pkg-config:
-
-```cmake
-# Set Hyperliquid SDK paths
-set(HYPERLIQUID_ROOT "/path/to/hyperliquid-c")
-set(HYPERLIQUID_INCLUDE_DIR "${HYPERLIQUID_ROOT}/include")
-set(HYPERLIQUID_LIB_DIR "${HYPERLIQUID_ROOT}/build/lib")
-
-# Include directories
-include_directories(${HYPERLIQUID_INCLUDE_DIR})
-
-# Link libraries
-target_link_libraries(your_target 
-    "${HYPERLIQUID_LIB_DIR}/libhyperliquid.a"
-    curl cjson ssl crypto msgpackc secp256k1 m pthread)
-```
-
-### FetchContent Integration
-
-For modern CMake projects, use FetchContent to include the SDK as a subproject:
-
-```cmake
-# CMake 3.14+ - Fetch and build Hyperliquid SDK
-include(FetchContent)
-
-FetchContent_Declare(
-    hyperliquid-c
-    GIT_REPOSITORY https://github.com/hyperliquid/hyperliquid-c.git
-    GIT_TAG v1.0.0
-)
-
-FetchContent_MakeAvailable(hyperliquid-c)
-
-# Link against the built target
-target_link_libraries(your_target hyperliquid-c)
-```
-
-### Creating a Config File
-
-Create a `hyperliquid-config.cmake` file for seamless integration:
-
-```cmake
-# hyperliquid-config.cmake
-set(HYPERLIQUID_INCLUDE_DIRS "/usr/local/include")
-set(HYPERLIQUID_LIBRARIES 
-    "/usr/local/lib/libhyperliquid.a"
-    curl cjson ssl crypto msgpackc secp256k1 m pthread)
-set(HYPERLIQUID_FOUND TRUE)
-```
-
-**Section sources**
-- [Makefile](file://Makefile#L13)
-
-## Installation Verification
-
-After installation, verify that the Hyperliquid C SDK is properly installed and functional through test compilation and basic functionality checks.
-
-### Test Compilation
-
-Create a simple test program to verify the installation:
-
-```c
-// test_hyperliquid.c
-#include <stdio.h>
-#include "hyperliquid.h"
-
-int main() {
-    printf("Hyperliquid SDK version 1.0.0\n");
-    
-    // Test client creation (without actual credentials)
-    hl_client_t* client = hl_client_create(NULL, NULL, true);
-    if (client) {
-        printf("✓ Client creation successful\n");
-        hl_client_destroy(client);
-    } else {
-        printf("✗ Client creation failed\n");
-        return 1;
-    }
-    
-    printf("✓ Hyperliquid SDK installation verified\n");
-    return 0;
-}
-```
-
-Compile and run the test:
-
-```bash
-# Compile the test program
-gcc -o test_hyperliquid test_hyperliquid.c -lhyperliquid -lcurl -lcjson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread
-
-# Run the test
-./test_hyperliquid
-```
-
-### Running Provided Examples
-
-The SDK includes example programs that demonstrate various functionalities:
-
-```bash
-# Build all examples
-make examples
-
-# Run a specific example
-./build/bin/simple_balance
-./build/bin/simple_trade
-./build/bin/websocket_demo
-```
-
-### Running Tests
-
-The SDK includes a comprehensive test suite to verify functionality:
-
-```bash
-# Build and run all tests
-make test
-
-# Build tests only
-make tests
-
-# Run memory checks with valgrind
-make memcheck
-```
-
-### Build Information
-
-Display build configuration information:
-
-```bash
-# Show build configuration
-make info
-```
-
-This command displays compiler settings, flags, library versions, and source file counts to verify the build environment.
-
-**Section sources**
-- [Makefile](file://Makefile#L147-L214)
-- [examples/simple_balance.c](file://examples/simple_balance.c)
-- [examples/simple_trade.c](file://examples/simple_trade.c)
-
-## Header File Management
-
-The SDK includes a script to manage header file includes, ensuring consistency across the codebase.
-
-### fix_includes.sh Script
-
-The `fix_includes.sh` script automatically corrects include statements in source files to use the proper header names:
-
-```bash
-# Run the include fixing script
-./fix_includes.sh
-```
-
-This script performs the following operations:
-
-1. **Crypto Files**: Updates includes in `src/crypto/*.c`:
-   - Changes `#include "crypto_utils.h"` to `#include "hl_crypto_internal.h"`
-   - Changes `#include "logger.h"` to `#include "hl_logger.h"`
-   - Changes `#include "sha3.h"` to `#include "hl_crypto_internal.h"`
-
-2. **Msgpack Files**: Updates includes in `src/msgpack/*.c`:
-   - Changes `#include "hyperliquid_action.h"` to `#include "hl_msgpack.h"`
-   - Changes `#include "crypto_utils.h"` to `#include "hl_crypto_internal.h"`
-
-3. **HTTP Files**: Updates includes in `src/http/*.c`:
-   - Changes `#include "http_client.h"` to `#include "hl_http.h"`
-   - Changes `#include "logger.h"` to `#include "hl_logger.h"`
-   - Replaces `#include "memory.h"` with a comment
-
-### When to Use fix_includes.sh
-
-Run the `fix_includes.sh` script in the following scenarios:
-
-- After copying files from external sources
-- When adding new source files that may have incorrect includes
-- Before committing changes to ensure include consistency
-- After merging code from different branches that might have different include conventions
-
-The script should be run from the repository root directory and requires `sed` to be available on the system. On macOS, the script uses `sed -i ''` for in-place editing, which is compatible with BSD sed.
-
-**Section sources**
-- [fix_includes.sh](file://fix_includes.sh)
-- [Makefile](file://Makefile#L10)
-
-## Troubleshooting
-
-This section addresses common build errors and their solutions, focusing on issues related to missing symbols and library paths.
+## Troubleshooting Common Issues
 
 ### Missing Dependencies
 
 **Error**: `fatal error: curl/curl.h: No such file or directory`
-**Solution**: Install the missing development package:
-```bash
-# Ubuntu/Debian
-sudo apt-get install libcurl4-openssl-dev
 
-# macOS
-brew install curl
+**Solution**: Install the development package for the missing library:
+- Ubuntu/Debian: `sudo apt-get install libcurl4-openssl-dev`
+- macOS: `brew install curl`
+
+### Linker Errors
+
+**Error**: `undefined reference to 'curl_easy_init'`
+
+**Solution**: Ensure all required libraries are linked in the correct order:
+```bash
+-lhyperliquid -lcurl -lcjson -lsecp256k1 -lmsgpackc -lpthread -luuid -lssl -lcrypto
 ```
 
-### Library Not Found
+### Compilation Warnings/Errors
 
-**Error**: `cannot find -lcurl`
-**Solution**: Ensure development packages are installed and libraries are in the library path:
+**Error**: Compiler warnings treated as errors (`-Werror`)
+
+**Solution**: Check for strict C99 compliance issues or modify CFLAGS in Makefile if necessary.
+
+### Cryptographic Issues
+
+**Error**: Signature verification failures
+
+**Solution**: 
+- Verify private key is 64 hexadecimal characters (without `0x` prefix)
+- Ensure `libsecp256k1` is properly installed and linked
+- Check wallet address format (must start with `0x`)
+
+### Platform-Specific Issues
+
+**On macOS**: If encountering UUID-related errors:
 ```bash
-# Verify library locations
-find /usr -name "libcurl*" 2>/dev/null
-find /opt/homebrew -name "libcurl*" 2>/dev/null
-
-# Update library cache
-sudo ldconfig
+brew install ossp-uuid
 ```
 
-### Undefined Symbols
-
-**Error**: Linker errors about undefined symbols from secp256k1 or other libraries
-**Solution**: Ensure all required libraries are specified in the correct order:
+**On Windows (MSYS2)**: Use the MinGW-w64 toolchain:
 ```bash
-# Link with all required libraries
--lhyperliquid -lcurl -lcjson -lssl -lcrypto -lmsgpackc -lsecp256k1 -lm -lpthread
+pacman -S mingw-w64-x86_64-{curl,jansson,libsecp256k1}
+make CC=gcc
 ```
-
-### Header File Issues
-
-**Error**: `fatal error: hyperliquid.h: No such file or directory`
-**Solution**: Verify installation and include paths:
-```bash
-# Check if header exists
-ls /usr/local/include/hyperliquid.h
-
-# Specify include path explicitly
--I/usr/local/include
-```
-
-### Architecture Mismatch
-
-**Error**: `cannot execute binary file: Exec format error` during cross-compilation
-**Solution**: Ensure the cross-compiler is properly installed and target architecture matches:
-```bash
-# Verify compiler target
-x86_64-w64-mingw32-gcc -v
-aarch64-linux-gnu-gcc -v
-```
-
-### Permission Issues
-
-**Error**: `Permission denied` during installation
-**Solution**: Use sudo for system-wide installation:
-```bash
-# Install with elevated privileges
-sudo make install
-```
-
-Or install to a user-writable directory:
-```bash
-# Install to home directory
-make install prefix=$HOME/local
-```
-
-### Debugging Build Issues
-
-Use the `info` target to display build configuration:
-```bash
-# Show build configuration
-make info
-```
-
-This displays the compiler, flags, include paths, and library dependencies being used in the build process, helping to identify configuration issues.
 
 **Section sources**
-- [Makefile](file://Makefile#L13)
-- [README.md](file://README.md#L216-L230)
-- [fix_includes.sh](file://fix_includes.sh)
+- [QUICKSTART.md](file://QUICKSTART.md#L200-L240)
+- [README.md](file://README.md#L230-L245)
+
+## Verification and Testing
+
+### Running the Connection Test
+
+Verify the installation by running the simple balance example:
+
+```bash
+make examples
+./build/bin/example_balance
+```
+
+Expected output:
+```
+🔍 Hyperliquid Balance Example
+============================
+✅ Client created successfully
+📊 Fetching perpetual balance...
+✅ Perpetual Balance:
+   Account Value: 1000.00 USDC
+   Margin Used: 0.00 USDC
+   Withdrawable: 1000.00 USDC
+   Total Notional: 0.00 USDC
+```
+
+### Running Unit Tests
+
+Execute the full test suite to verify library functionality:
+
+```bash
+make test
+```
+
+This runs all tests and reports:
+- Compilation success
+- Runtime behavior
+- Memory safety (if using debug build)
+
+### Integration Testing
+
+For comprehensive verification, run integration tests that connect to the Hyperliquid API:
+
+```bash
+make test-integration
+```
+
+Note: This requires valid API credentials in environment variables.
+
+**Section sources**
+- [simple_balance.c](file://examples/simple_balance.c#L1-L88)
+- [simple_test.c](file://tests/simple_test.c#L1-L36)
+
+## Configuration Options
+
+### Testnet vs Mainnet
+
+The library supports both testnet and mainnet environments:
+
+```c
+// Testnet (recommended for development)
+hl_client_t* testnet_client = hl_client_create(wallet, key, true);
+
+// Mainnet (for live trading)
+hl_client_t* mainnet_client = hl_client_create(wallet, key, false);
+```
+
+**Important**: Always test thoroughly on testnet before using mainnet credentials.
+
+### Client Options
+
+Additional client configuration can be managed through environment variables or direct parameters:
+
+- **Timeout**: Default 30 seconds, configurable via client structure
+- **Debug Mode**: Enabled in debug builds
+- **Rate Limiting**: Built-in to respect API limits
+
+### Build Configuration
+
+The Makefile supports platform detection and conditional compilation:
+
+- Automatic shared library extension selection (`.so` vs `.dll`)
+- Compiler flag optimization
+- Dependency path configuration via `INCLUDES` and `LIBS` variables
+
+**Section sources**
+- [QUICKSTART.md](file://QUICKSTART.md#L55-L65)
+- [README.md](file://README.md#L299-L304)

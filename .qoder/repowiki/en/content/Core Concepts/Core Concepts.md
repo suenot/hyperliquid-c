@@ -2,239 +2,271 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [hl_client.h](file://include/hl_client.h)
-- [hl_types.h](file://include/hl_types.h)
-- [client.c](file://src/client.c)
+- [hl_error.h](file://include/hl_error.h)
+- [hl_msgpack.h](file://include/hl_msgpack.h)
 - [serialize.c](file://src/msgpack/serialize.c)
+- [hl_crypto_internal.h](file://include/hl_crypto_internal.h)
 - [eip712.c](file://src/crypto/eip712.c)
+- [hl_client.h](file://include/hl_client.h)
+- [client.c](file://src/client.c)
+- [trading_api.c](file://src/trading_api.c)
+- [hyperliquid.h](file://include/hyperliquid.h)
 </cite>
 
 ## Table of Contents
-1. [Opaque Client Handle](#opaque-client-handle)
-2. [Error Code Conventions](#error-code-conventions)
-3. [Thread Safety Model](#thread-safety-model)
-4. [Key Data Types](#key-data-types)
-5. [Zero-Copy Design Philosophy](#zero-copy-design-philosophy)
-6. [RAII-Like Resource Management](#raii-like-resource-management)
-7. [EIP-712 Signing for Authentication](#eip-712-signing-for-authentication)
-8. [MessagePack for Efficient Serialization](#messagepack-for-efficient-serialization)
-9. [Public vs Internal Headers](#public-vs-internal-headers)
-10. [Request-Response Lifecycle](#request-response-lifecycle)
-11. [Memory Management Best Practices](#memory-management-best-practices)
+1. [EIP-712 Typed Data Signing](#eip-712-typed-data-signing)
+2. [MessagePack Binary Serialization](#messagepack-binary-serialization)
+3. [Thread Safety and Reentrancy](#thread-safety-and-reentrancy)
+4. [Zero-Copy Design Philosophy](#zero-copy-design-philosophy)
+5. [Error Handling System](#error-handling-system)
+6. [Memory Management Responsibilities](#memory-management-responsibilities)
 
-## Opaque Client Handle
+## EIP-712 Typed Data Signing
 
-The `hl_client_t` opaque handle serves as the central interface for interacting with the Hyperliquid exchange. This handle encapsulates all necessary state, including authentication credentials, network clients, and configuration options. Users interact with the client through a well-defined API without direct access to its internal structure, promoting encapsulation and API stability.
+The hyperliquid-c library implements EIP-712 typed data signing for secure order authentication, ensuring that trading operations are cryptographically verified and tamper-proof. This mechanism leverages Ethereum's EIP-712 standard to create structured, human-readable data hashes that are signed using ECDSA on the secp256k1 curve.
 
-The client is created using `hl_client_create()` and must be properly destroyed using `hl_client_destroy()` to release associated resources. The opaque nature of the handle allows for internal implementation changes without affecting the public API.
+Authentication is based on a two-layer hashing approach: first computing the domain separator hash, then the message-specific struct hash. The domain separator establishes the signing context with critical parameters including the domain name ("Exchange"), chain ID (1337), version ("1"), and verifying contract (zero address). This prevents replay attacks across different networks or applications.
 
-**Section sources**
-- [hl_client.h](file://include/hl_client.h#L13)
-- [client.c](file://src/client.c#L34-L87)
+For order operations, the library constructs an "Agent" struct containing the source identifier ("a" for mainnet, "b" for testnet) and a unique connection ID derived from MessagePack serialization of the action payload. The final signing hash is computed as `keccak256(0x1901 || domainSeparator || structHash)`, following the EIP-712 specification precisely.
 
-## Error Code Conventions
-
-The library uses a consistent error code convention where negative integer values represent errors and zero indicates success. Each error code corresponds to a specific failure mode, such as `HL_ERROR_INVALID_PARAMS`, `HL_ERROR_NETWORK`, or `HL_ERROR_AUTH`. This convention enables straightforward error checking and handling across all API functions.
-
-The `hl_error_string()` function provides human-readable descriptions of error codes, facilitating debugging and user feedback. This approach ensures predictable error handling patterns throughout the library.
-
-**Section sources**
-- [client.c](file://src/client.c#L153-L170)
-
-## Thread Safety Model
-
-The hyperliquid-c library implements thread safety using pthread mutexes to protect shared client state. Each `hl_client_t` instance contains a dedicated `pthread_mutex_t` that is initialized during client creation and destroyed during cleanup. This mutex protects access to the HTTP client and other shared resources.
-
-All public API functions that access mutable client state acquire this mutex before execution and release it upon completion, ensuring that concurrent calls from multiple threads are properly serialized. This design allows the client to be safely used in multi-threaded applications without requiring external synchronization.
-
-```mermaid
-classDiagram
-class hl_client {
-+wallet_address[43] string
-+private_key[65] string
-+testnet bool
-+http http_client_t*
-+timeout_ms uint32_t
-+mutex pthread_mutex_t
-+debug bool
-}
-```
-
-**Diagram sources**
-- [client.c](file://src/client.c#L34-L45)
-
-**Section sources**
-- [client.c](file://src/client.c#L34-L107)
-
-## Key Data Types
-
-The library defines several key data structures in `hl_types.h` and related headers to represent exchange data and operations. These include:
-
-- `hl_order_request_t`: Represents an order submission with fields for symbol, side, price, quantity, and order parameters
-- `hl_ticker_t`: Contains market data including bid, ask, last price, volume, and timestamp information
-- `hl_position_t`: Represents an open position with details like coin, size, entry price, and leverage
-
-These structures follow a consistent naming and documentation convention, with descriptive field names and clear comments explaining their purpose and usage.
-
-```mermaid
-classDiagram
-class hl_order_request_t {
-+symbol* const char
-+side hl_side_t
-+price double
-+quantity double
-+order_type hl_order_type_t
-+time_in_force hl_time_in_force_t
-+reduce_only bool
-+slippage_bps uint32_t
-}
-class hl_ticker_t {
-+symbol[64] char
-+bid double
-+ask double
-+last double
-+close double
-+previous_close double
-+quote_volume double
-+timestamp uint64_t
-+datetime[32] char
-+mark_price double
-+oracle_price double
-+funding_rate double
-+open_interest double
-}
-class hl_position_t {
-+coin[32] char
-+symbol[64] char
-+side hl_position_side_t
-+size double
-+entry_price double
-+mark_price double
-+liquidation_price double
-+unrealized_pnl double
-+margin_used double
-+position_value double
-+return_on_equity double
-+leverage int
-+max_leverage int
-+is_isolated bool
-+cum_funding_all_time double
-+cum_funding_since_open double
-+cum_funding_since_change double
-}
-```
-
-**Diagram sources**
-- [hyperliquid.h](file://include/hyperliquid.h#L127-L136)
-- [hl_ticker.h](file://include/hl_ticker.h#L26-L48)
-- [hl_account.h](file://include/hl_account.h#L85-L108)
-
-**Section sources**
-- [hl_types.h](file://include/hl_types.h)
-- [hyperliquid.h](file://include/hyperliquid.h#L127-L136)
-- [hl_ticker.h](file://include/hl_ticker.h#L26-L48)
-- [hl_account.h](file://include/hl_account.h#L85-L108)
-
-## Zero-Copy Design Philosophy
-
-The library adheres to a zero-copy design philosophy where possible, minimizing memory allocations and data copying during API operations. This is particularly evident in the MessagePack serialization implementation, where data is packed directly into buffers without intermediate representations.
-
-By avoiding unnecessary memory allocations and copies, the library reduces overhead and improves performance, especially in high-frequency trading scenarios where latency is critical. This design also reduces memory fragmentation and garbage collection pressure in long-running applications.
-
-**Section sources**
-- [serialize.c](file://src/msgpack/serialize.c)
-
-## RAII-Like Resource Management
-
-The library implements an RAII-like pattern for resource management, where resources are acquired during client creation and automatically released during destruction. The `hl_client_create()` function allocates memory, initializes mutexes, and creates HTTP clients, while `hl_client_destroy()` ensures proper cleanup of all resources.
-
-This pattern includes zeroing out sensitive data (like private keys) before freeing memory, providing an additional security layer against memory scraping attacks. The use of paired create/destroy functions ensures that resources are properly managed and prevents leaks.
-
-**Section sources**
-- [client.c](file://src/client.c#L89-L107)
-
-## EIP-712 Signing for Authentication
-
-Authentication with the Hyperliquid exchange is implemented using EIP-712 typed message signing, which provides a secure and standardized way to sign transactions off-chain. The library constructs structured data hashes using MessagePack serialization, then signs these hashes with the user's private key using secp256k1 ECDSA.
-
-The signing process involves computing a domain separator hash, creating a message-specific struct hash, and combining these with a prefix to generate the final signing hash. This approach ensures that signatures are context-aware and resistant to replay attacks across different domains.
+The implementation uses libsecp256k1 for production-grade cryptographic operations, with deterministic signatures via RFC 6979 to prevent private key exposure. Recovery IDs are properly calculated and encoded in Ethereum format (v = recovery_id + 27). The signing process is abstracted through the `eip712_sign_agent` function, which orchestrates domain hash computation, struct hash generation, and final signature creation.
 
 ```mermaid
 sequenceDiagram
-participant Application
-participant Library
-participant Exchange
-Application->>Library : Submit order
-Library->>Library : Build action hash (MessagePack)
-Library->>Library : Create EIP-712 domain hash
-Library->>Library : Create struct hash
-Library->>Library : Combine hashes with prefix
-Library->>Library : Sign with private key (secp256k1)
-Library->>Exchange : Send signed request
-Exchange->>Exchange : Verify signature
-Exchange->>Library : Return response
-Library->>Application : Return result
+participant Client as "Client App"
+participant SDK as "hyperliquid-c SDK"
+participant Crypto as "Crypto Module"
+Client->>SDK : Place Order Request
+SDK->>Crypto : Compute Domain Hash
+SDK->>Crypto : Build Action Hash (connection_id)
+SDK->>Crypto : Compute Agent Struct Hash
+SDK->>Crypto : Create Signing Hash (0x1901 + domain + struct)
+SDK->>Crypto : Sign with Private Key (ECDSA/secp256k1)
+Crypto-->>SDK : Signature (r, s, v)
+SDK->>Client : Signed Order Payload
 ```
 
 **Diagram sources**
-- [serialize.c](file://src/msgpack/serialize.c#L133-L204)
-- [eip712.c](file://src/crypto/eip712.c#L260-L295)
+- [eip712.c](file://src/crypto/eip712.c#L200-L297)
+- [hl_crypto_internal.h](file://include/hl_crypto_internal.h#L80-L86)
 
 **Section sources**
-- [eip712.c](file://src/crypto/eip712.c)
+- [eip712.c](file://src/crypto/eip712.c#L1-L297)
+- [hl_crypto_internal.h](file://include/hl_crypto_internal.h#L70-L86)
 
-## MessagePack for Efficient Serialization
+## MessagePack Binary Serialization
 
-The library uses MessagePack for efficient binary serialization of API requests, providing a compact and fast alternative to JSON. MessagePack's binary format reduces payload size and parsing overhead, improving network performance and reducing latency.
+The library employs MessagePack binary serialization for efficient payload encoding and action hash computation, achieving byte-perfect compatibility with Hyperliquid's Go-based backend. This compact binary format minimizes network bandwidth usage while maintaining type safety and fast serialization/deserialization performance.
 
-The serialization implementation carefully orders dictionary keys alphabetically to ensure consistent hash generation, which is critical for signature verification. The library provides specialized packing functions for different message types (orders, cancels) that directly write to MessagePack buffers without intermediate representations.
+MessagePack encoding follows strict alphabetical key ordering requirements to ensure deterministic hashing across different implementations. The serialization process constructs flat maps with minimal overhead, using single-character keys for efficiency (e.g., "a" for asset ID, "b" for buy/sell flag). Complex types like orders are serialized as maps with fields ordered alphabetically: a, b, p, r, s, t.
 
-**Section sources**
-- [serialize.c](file://src/msgpack/serialize.c)
+The action hashing workflow begins with MessagePack serialization of the action payload (order or cancel), followed by appending the nonce (timestamp in milliseconds) as big-endian uint64, and optionally a vault address flag and value. The complete byte stream is then hashed using Keccak256 to produce the 32-byte connection ID used in EIP-712 signing.
 
-## Public vs Internal Headers
-
-The library distinguishes between public and internal headers to maintain a clean API boundary. Public headers (e.g., `hl_client.h`, `hl_types.h`) contain the stable API that applications should use, while internal headers (e.g., `hl_crypto_internal.h`, `hl_internal.h`) contain implementation details that may change between versions.
-
-This separation allows the library to evolve internal implementations without breaking client code. Applications should only include public headers and avoid relying on internal implementation details that are not part of the official API.
-
-**Section sources**
-- [hl_client.h](file://include/hl_client.h)
-- [hl_crypto_internal.h](file://include/hl_crypto_internal.h)
-
-## Request-Response Lifecycle
-
-The request-response lifecycle begins with an API call that constructs a request structure, which is then serialized to MessagePack format. The library computes a cryptographic hash of the serialized data, signs it using EIP-712, and sends the signed request via HTTP to the exchange.
-
-Upon receiving a response, the library parses the MessagePack data, validates the response structure, and returns the result to the caller. Error responses are translated into appropriate error codes following the library's error convention. Throughout this process, the client's mutex ensures thread safety for concurrent operations.
+Key serialization functions include `pack_order_action` for order batches and `pack_cancel_action` for cancellation requests, both ensuring consistent dictionary insertion order as required by the exchange API. The implementation uses the official MessagePack C library with custom packing routines to maintain precise control over the output format.
 
 ```mermaid
 flowchart TD
-A[Application Call] --> B[Construct Request]
-B --> C[Serialize to MessagePack]
-C --> D[Compute Action Hash]
-D --> E[EIP-712 Signing]
-E --> F[HTTP Request]
-F --> G[Exchange Processing]
-G --> H[HTTP Response]
-H --> I[Parse MessagePack]
-I --> J[Validate Response]
-J --> K[Return Result]
+Start([Action Data]) --> Serialize["Serialize to MessagePack<br/>(Alphabetical Key Order)"]
+Serialize --> AppendNonce["Append Nonce<br/>(Big-endian uint64)"]
+AppendNonce --> AppendVault["Append Vault Address Flag<br/>(0x00 or 0x01 + address)"]
+AppendVault --> ComputeHash["Compute Keccak256 Hash"]
+ComputeHash --> ConnectionID["32-byte Connection ID"]
+ConnectionID --> UseForSigning["Use in EIP-712 Signing"]
+style Serialize fill:#f9f,stroke:#333
+style ComputeHash fill:#f9f,stroke:#333
 ```
 
 **Diagram sources**
-- [client.c](file://src/client.c)
-- [serialize.c](file://src/msgpack/serialize.c)
+- [serialize.c](file://src/msgpack/serialize.c#L100-L200)
+- [hl_msgpack.h](file://include/hl_msgpack.h#L50-L100)
 
 **Section sources**
-- [client.c](file://src/client.c)
-- [serialize.c](file://src/msgpack/serialize.c)
+- [serialize.c](file://src/msgpack/serialize.c#L1-L234)
+- [hl_msgpack.h](file://include/hl_msgpack.h#L1-L120)
 
-## Memory Management Best Practices
+## Thread Safety and Reentrancy
 
-Proper memory management is critical when using the hyperliquid-c library. Applications must always pair `hl_client_create()` calls with corresponding `hl_client_destroy()` calls to prevent resource leaks. The destroy function handles cleanup of all internal resources, including memory, mutexes, and network clients.
+The hyperliquid-c library provides thread safety guarantees through explicit mutex protection of shared client state, enabling safe concurrent access from multiple threads. Each client instance contains a pthread mutex that protects critical sections involving HTTP communication, cryptographic operations, and state modifications.
 
-Sensitive data like private keys are explicitly zeroed before memory is freed, protecting against potential exposure through memory dumps. Applications should avoid holding references to data returned by the library beyond the scope of the calling function unless explicitly documented as safe.
+The implementation follows a consistent pattern of mutex acquisition before any operation that accesses shared resources, particularly around the HTTP request lifecycle and cryptographic signing. In `hl_place_order` and `hl_cancel_order`, the mutex is locked for the entire duration of the operation, from action hash generation through signature creation to HTTP transmission, preventing race conditions when multiple threads use the same client.
+
+Reentrancy is supported within the constraints of the mutex-based locking strategy. While the library does not support true asynchronous reentrancy (nested calls from signal handlers), it allows sequential operations from different threads by queuing access to the shared client state. This design prioritizes correctness over maximum concurrency, ensuring that each operation completes atomically.
+
+The thread safety model assumes that client creation and destruction occur in a single-threaded context, while subsequent operations (order placement, cancellation, etc.) can be safely called from multiple threads. This balances performance with safety, avoiding the complexity of fully lock-free data structures while preventing common concurrency bugs.
+
+```mermaid
+sequenceDiagram
+participant Thread1
+participant Thread2
+participant Client as "hl_client_t"
+participant Mutex as "pthread_mutex_t"
+Thread1->>Client : hl_place_order()
+Client->>Mutex : pthread_mutex_lock()
+Mutex-->>Client : Lock Acquired
+Client->>Client : Build Action Hash
+Client->>Client : Sign Request
+Client->>Client : HTTP POST
+Client->>Client : Process Response
+Client->>Mutex : pthread_mutex_unlock()
+Thread2->>Client : hl_cancel_order()
+Client->>Mutex : pthread_mutex_lock()
+Mutex-->>Client : Wait for Lock
+Mutex-->>Client : Lock Acquired (after Thread1)
+Client->>Client : Process Cancel
+Client->>Mutex : pthread_mutex_unlock()
+```
+
+**Diagram sources**
+- [client.c](file://src/client.c#L50-L100)
+- [trading_api.c](file://src/trading_api.c#L100-L150)
 
 **Section sources**
-- [client.c](file://src/client.c#L89-L107)
+- [client.c](file://src/client.c#L1-L197)
+- [trading_api.c](file://src/trading_api.c#L1-L340)
+
+## Zero-Copy Design Philosophy
+
+The library adheres to a zero-copy design philosophy that minimizes memory allocations and data copying throughout the request lifecycle, optimizing performance and reducing heap fragmentation. This approach prioritizes stack allocation, static buffers, and direct references over dynamic memory allocation whenever possible.
+
+Critical data structures like `hl_order_t` and `hl_cancel_t` are designed to hold pointers to string data rather than owning copies, allowing callers to provide string literals or stack-allocated buffers. The action hash computation uses stack-allocated buffers for intermediate data, with only temporary heap allocation for the concatenated message before hashing.
+
+String formatting operations use fixed-size buffers on the stack (e.g., `char price_str[64]`) rather than dynamically allocated strings, eliminating allocation overhead for transient data. The HTTP request body is constructed directly into a stack buffer using `snprintf`, avoiding intermediate string objects.
+
+The design avoids unnecessary data duplication by passing references through the call chain. For example, the wallet address and private key are stored once in the client structure and referenced directly during signing operations, rather than being copied to temporary buffers.
+
+This philosophy extends to the API design, where output parameters are provided by the caller (e.g., `hl_order_result_t *result`) rather than allocated by the library, giving the caller control over memory management and enabling stack allocation of result structures.
+
+```mermaid
+flowchart LR
+subgraph StackAllocation
+A["hl_order_request_t (stack)"]
+B["price_str[64] (stack)"]
+C["size_str[64] (stack)"]
+D["json_body[4096] (stack)"]
+end
+subgraph HeapAllocation
+E["connection_id[32] (stack)"]
+F["signature[65] (stack)"]
+G["order_id (strdup only on success)"]
+end
+H["External Data"] --> A
+A --> B
+A --> C
+B --> D
+C --> D
+D --> E
+E --> F
+F --> G
+style StackAllocation fill:#e6f3ff,stroke:#333
+style HeapAllocation fill:#fff2cc,stroke:#333
+```
+
+**Diagram sources**
+- [trading_api.c](file://src/trading_api.c#L150-L250)
+- [client.c](file://src/client.c#L100-L150)
+
+**Section sources**
+- [trading_api.c](file://src/trading_api.c#L1-L340)
+- [client.c](file://src/client.c#L1-L197)
+
+## Error Handling System
+
+The library implements a comprehensive error handling system centered around the `hl_error_t` enum, providing clear error codes and descriptive messages for troubleshooting. Errors are propagated through return values rather than exceptions, following C programming conventions.
+
+The `hl_error_t` enum defines 16 distinct error conditions ranging from `HL_SUCCESS` (0) to `HL_ERROR_PARSE` (-15), covering validation, network, API, authentication, and system-level failures. Each error code corresponds to a specific failure mode, enabling precise error handling in client applications.
+
+Error information is conveyed through both return codes and optional output parameters. Functions like `hl_place_order` and `hl_cancel_order` return `hl_error_t` while also populating error message fields in result structures (e.g., `result->error`). This dual approach allows for both programmatic error handling and user-facing error display.
+
+The `hl_error_string` function provides human-readable descriptions for each error code, facilitating debugging and logging. The system distinguishes between recoverable errors (e.g., `HL_ERROR_NETWORK`, `HL_ERROR_TIMEOUT`) and unrecoverable errors (e.g., `HL_ERROR_INVALID_PARAMS`, `HL_ERROR_SIGNATURE`), guiding appropriate retry strategies.
+
+Error handling is consistent across the API, with validation performed early in function execution and errors returned immediately upon detection. This fail-fast approach minimizes resource consumption for invalid operations and provides clear feedback to callers.
+
+```mermaid
+stateDiagram-v2
+[*] --> Operation
+Operation --> Validate : "Check parameters"
+Validate --> InvalidParams : "HL_ERROR_INVALID_PARAMS"
+Validate --> CheckState : "Valid"
+CheckState --> NetworkError : "HL_ERROR_NETWORK"
+CheckState --> ApiError : "HL_ERROR_API"
+CheckState --> AuthError : "HL_ERROR_AUTH"
+CheckState --> Success : "HL_SUCCESS"
+InvalidParams --> [*]
+NetworkError --> [*]
+ApiError --> [*]
+AuthError --> [*]
+Success --> [*]
+note right of Validate
+Early validation prevents
+unnecessary processing
+end note
+```
+
+**Diagram sources**
+- [hl_error.h](file://include/hl_error.h#L1-L37)
+- [hyperliquid.h](file://include/hyperliquid.h#L500-L550)
+
+**Section sources**
+- [hl_error.h](file://include/hl_error.h#L1-L37)
+- [hyperliquid.h](file://include/hyperliquid.h#L500-L550)
+
+## Memory Management Responsibilities
+
+The library follows a clear ownership model for memory management, delineating responsibilities between caller and library to prevent leaks and double-frees. This model combines automatic cleanup of internal state with explicit caller responsibility for certain allocated resources.
+
+The library owns all internal client state, automatically freeing resources in `hl_client_destroy`. This includes the HTTP client handle, mutex, and any internal data structures. The private key is securely zeroed before client memory is freed, protecting sensitive information.
+
+Callers are responsible for freeing specific allocated outputs, particularly strings returned through output parameters. For example, `hl_order_result_t.order_id` is allocated with `strdup` on successful order placement and must be freed by the caller using `free`. Similarly, arrays of trades or orders returned by fetch functions must be freed using dedicated cleanup functions like `hl_free_trades`.
+
+The API design minimizes heap allocation by using output parameters for most data, allowing callers to provide stack-allocated structures. When allocation is necessary, the library clearly documents ownership transfer through function documentation and naming conventions.
+
+Temporary allocations during request processing (e.g., for action hashing) are managed internally and automatically cleaned up, even in error conditions, using cleanup patterns with `goto` statements to ensure proper resource release.
+
+```mermaid
+classDiagram
+class hl_client_t {
++wallet_address[43]
++private_key[65]
++http_client_t* http
++pthread_mutex_t mutex
+}
+class hl_order_result_t {
++char* order_id
++hl_order_status_t status
++double filled_quantity
++double average_price
++char error[256]
+}
+class hl_trades_t {
++hl_trade_t* trades
++size_t count
+}
+class Caller {
++Manages : order_id
++Manages : trades array
++Provides : result structures
+}
+class Library {
++Manages : client state
++Manages : HTTP resources
++Manages : mutex
++Cleans : temporary allocations
+}
+Caller --> hl_order_result_t : "Frees order_id"
+Caller --> hl_trades_t : "Calls hl_free_trades()"
+Library --> hl_client_t : "Frees in hl_client_destroy()"
+Library --> hl_order_result_t : "Allocates order_id on success"
+Library --> hl_trades_t : "Allocates trades array"
+style Library fill : #d9ead3,stroke : #333
+style Caller fill : #fce5cd,stroke : #333
+```
+
+**Diagram sources**
+- [client.c](file://src/client.c#L150-L197)
+- [hyperliquid.h](file://include/hyperliquid.h#L400-L450)
+- [trading_api.c](file://src/trading_api.c#L250-L300)
+
+**Section sources**
+- [client.c](file://src/client.c#L1-L197)
+- [hyperliquid.h](file://include/hyperliquid.h#L1-L617)
+- [trading_api.c](file://src/trading_api.c#L1-L340)

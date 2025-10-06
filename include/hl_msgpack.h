@@ -21,8 +21,8 @@ typedef struct {
 } hl_limit_t;
 
 /**
- * @brief Order request structure
- * 
+ * @brief Order request structure (internal MessagePack format)
+ *
  * Follows Hyperliquid API format with short field names for MessagePack
  */
 typedef struct {
@@ -32,13 +32,13 @@ typedef struct {
     const char *s;     /**< Size (string) */
     bool r;            /**< Reduce only */
     hl_limit_t limit;  /**< Limit order config */
-} hl_order_t;
+} hl_order_request_t;
 
 /**
  * @brief Order action for placing orders
  */
 typedef struct {
-    hl_order_t *orders;       /**< Array of orders */
+    hl_order_request_t *orders; /**< Array of orders */
     size_t orders_count;      /**< Number of orders */
     const char *grouping;     /**< Grouping: "na" for normal */
 } hl_order_action_t;
@@ -91,7 +91,7 @@ int hl_build_action_hash(const char *action_type,
  * @param connection_id_out Output buffer for 32-byte hash
  * @return 0 on success, -1 on error
  */
-int hl_build_order_hash(const hl_order_t *orders,
+int hl_build_order_hash(const hl_order_request_t *orders,
                         size_t orders_count,
                         const char *grouping,
                         uint64_t nonce,
