@@ -22,7 +22,8 @@ CORE_SRCS = $(wildcard $(SRC_DIR)/crypto/*.c) \
             $(SRC_DIR)/account.c \
             $(SRC_DIR)/markets.c \
             $(SRC_DIR)/ticker.c \
-            $(SRC_DIR)/orderbook.c
+            $(SRC_DIR)/orderbook.c \
+            $(SRC_DIR)/ohlcv.c
 
 TEST_HELPER_SRCS = $(TEST_DIR)/helpers/test_common.c
 
@@ -185,9 +186,14 @@ test_fetch_order_book: $(BIN_DIR)/test_fetch_order_book
 	@echo "Running test_fetch_order_book..."
 	@$(BIN_DIR)/test_fetch_order_book
 
-test_fetch_ohlcv:
-	@echo "❌ test_fetch_ohlcv not yet implemented"
-	@echo "   Location: tests/integration/02_market_data/test_fetch_ohlcv.c"
+$(BIN_DIR)/test_fetch_ohlcv: $(TEST_DIR)/integration/02_market_data/test_fetch_ohlcv.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+test_fetch_ohlcv: $(BIN_DIR)/test_fetch_ohlcv
+	@echo "Running test_fetch_ohlcv..."
+	@$(BIN_DIR)/test_fetch_ohlcv
 
 # Test suites
 test-unit: test_crypto_msgpack
@@ -265,6 +271,15 @@ $(BIN_DIR)/example_orderbook: examples/simple_orderbook.c $(CORE_OBJS) $(TEST_HE
 example_orderbook: $(BIN_DIR)/example_orderbook
 	@echo "Running example_orderbook..."
 	@$(BIN_DIR)/example_orderbook
+
+$(BIN_DIR)/example_ohlcv: examples/simple_ohlcv.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+example_ohlcv: $(BIN_DIR)/example_ohlcv
+	@echo "Running example_ohlcv..."
+	@$(BIN_DIR)/example_ohlcv
 
 # Clean
 clean:

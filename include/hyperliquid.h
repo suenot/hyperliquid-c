@@ -413,6 +413,7 @@ void hl_set_debug(bool enabled);
 #include "hl_account.h"
 #include "hl_markets.h"
 #include "hl_orderbook.h"
+#include "hl_ohlcv.h"
 
 #ifdef __cplusplus
 }
