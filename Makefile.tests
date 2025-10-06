@@ -146,9 +146,14 @@ test_fetch_balance: $(BIN_DIR)/test_fetch_balance
 	@echo "Running test_fetch_balance..."
 	@$(BIN_DIR)/test_fetch_balance
 
-test_fetch_positions:
-	@echo "❌ test_fetch_positions not yet implemented"
-	@echo "   Location: tests/integration/03_account/test_fetch_positions.c"
+$(BIN_DIR)/test_fetch_positions: $(TEST_DIR)/integration/03_account/test_fetch_positions.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+test_fetch_positions: $(BIN_DIR)/test_fetch_positions
+	@echo "Running test_fetch_positions..."
+	@$(BIN_DIR)/test_fetch_positions
 
 test_fetch_markets:
 	@echo "❌ test_fetch_markets not yet implemented"
@@ -206,6 +211,15 @@ $(BIN_DIR)/example_balance: examples/simple_balance.c $(CORE_OBJS) $(TEST_HELPER
 example_balance: $(BIN_DIR)/example_balance
 	@echo "Running example_balance..."
 	@$(BIN_DIR)/example_balance
+
+$(BIN_DIR)/example_positions: examples/simple_positions.c $(CORE_OBJS) $(TEST_HELPER_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(CORE_OBJS) $(TEST_HELPER_OBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+example_positions: $(BIN_DIR)/example_positions
+	@echo "Running example_positions..."
+	@$(BIN_DIR)/example_positions
 
 # Clean
 clean:

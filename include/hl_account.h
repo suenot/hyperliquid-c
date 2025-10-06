@@ -101,10 +101,11 @@ typedef struct {
     int leverage;            /**< Current leverage */
     int max_leverage;        /**< Max leverage allowed */
     bool is_isolated;        /**< Isolated margin mode */
-    
+
     // Cumulative funding
     double cum_funding_all_time;
     double cum_funding_since_open;
+    double cum_funding_since_change;
 } hl_position_t;
 
 /**

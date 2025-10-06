@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <cjson/cJSON.h>
 
 // Internal client accessor (from client.c)
@@ -271,18 +272,224 @@ void hl_free_spot_balances(hl_spot_balance_t* balances, size_t count) {
 }
 
 /**
+ * @brief Parse single position from JSON
+ */
+static hl_error_t parse_position(cJSON* position_data, hl_position_t* position) {
+    if (!position_data || !position) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Get the position object
+    cJSON* pos = cJSON_GetObjectItem(position_data, "position");
+    if (!pos) {
+        return HL_ERROR_PARSE;
+    }
+
+    // Parse coin/symbol
+    cJSON* coin = cJSON_GetObjectItem(pos, "coin");
+    if (!coin || !cJSON_IsString(coin)) {
+        return HL_ERROR_PARSE;
+    }
+
+    // For now, create symbol as "COIN/USDC:USDC"
+    // TODO: Use proper market mapping when fetch_markets is implemented
+    char symbol[64];
+    snprintf(symbol, sizeof(symbol), "%s/USDC:USDC", coin->valuestring);
+    strncpy(position->symbol, symbol, sizeof(position->symbol) - 1);
+
+    // Parse size and determine side
+    cJSON* szi = cJSON_GetObjectItem(pos, "szi");
+    if (szi) {
+        position->size = cJSON_IsString(szi) ? atof(szi->valuestring) : szi->valuedouble;
+        position->side = (position->size > 0) ? HL_POSITION_LONG : HL_POSITION_SHORT;
+        position->size = fabs(position->size); // Absolute value
+    }
+
+    // Parse entry price
+    cJSON* entry_px = cJSON_GetObjectItem(pos, "entryPx");
+    if (entry_px) {
+        position->entry_price = cJSON_IsString(entry_px) ?
+            atof(entry_px->valuestring) : entry_px->valuedouble;
+    }
+
+    // Parse liquidation price
+    cJSON* liq_px = cJSON_GetObjectItem(pos, "liquidationPx");
+    if (liq_px) {
+        position->liquidation_price = cJSON_IsString(liq_px) ?
+            atof(liq_px->valuestring) : liq_px->valuedouble;
+    }
+
+    // Parse unrealized PnL
+    cJSON* unrealized_pnl = cJSON_GetObjectItem(pos, "unrealizedPnl");
+    if (unrealized_pnl) {
+        position->unrealized_pnl = cJSON_IsString(unrealized_pnl) ?
+            atof(unrealized_pnl->valuestring) : unrealized_pnl->valuedouble;
+    }
+
+    // Parse margin used
+    cJSON* margin_used = cJSON_GetObjectItem(pos, "marginUsed");
+    if (margin_used) {
+        position->margin_used = cJSON_IsString(margin_used) ?
+            atof(margin_used->valuestring) : margin_used->valuedouble;
+    }
+
+    // Parse position value
+    cJSON* position_value = cJSON_GetObjectItem(pos, "positionValue");
+    if (position_value) {
+        position->position_value = cJSON_IsString(position_value) ?
+            atof(position_value->valuestring) : position_value->valuedouble;
+    }
+
+    // Parse return on equity
+    cJSON* roe = cJSON_GetObjectItem(pos, "returnOnEquity");
+    if (roe) {
+        position->return_on_equity = cJSON_IsString(roe) ?
+            atof(roe->valuestring) : roe->valuedouble;
+    }
+
+    // Parse leverage
+    cJSON* leverage_obj = cJSON_GetObjectItem(pos, "leverage");
+    if (leverage_obj && cJSON_IsObject(leverage_obj)) {
+        cJSON* leverage_value = cJSON_GetObjectItem(leverage_obj, "value");
+        if (leverage_value) {
+            position->leverage = cJSON_IsString(leverage_value) ?
+                atoi(leverage_value->valuestring) : leverage_value->valueint;
+        }
+
+        cJSON* leverage_type = cJSON_GetObjectItem(leverage_obj, "type");
+        if (leverage_type && cJSON_IsString(leverage_type)) {
+            position->is_isolated = (strcmp(leverage_type->valuestring, "isolated") == 0);
+        }
+    }
+
+    // Parse max leverage
+    cJSON* max_leverage = cJSON_GetObjectItem(pos, "maxLeverage");
+    if (max_leverage) {
+        position->max_leverage = cJSON_IsString(max_leverage) ?
+            atoi(max_leverage->valuestring) : max_leverage->valueint;
+    }
+
+    // Parse cumulative funding
+    cJSON* cum_funding = cJSON_GetObjectItem(pos, "cumFunding");
+    if (cum_funding && cJSON_IsObject(cum_funding)) {
+        cJSON* all_time = cJSON_GetObjectItem(cum_funding, "allTime");
+        if (all_time) {
+            position->cum_funding_all_time = cJSON_IsString(all_time) ?
+                atof(all_time->valuestring) : all_time->valuedouble;
+        }
+
+        cJSON* since_open = cJSON_GetObjectItem(cum_funding, "sinceOpen");
+        if (since_open) {
+            position->cum_funding_since_open = cJSON_IsString(since_open) ?
+                atof(since_open->valuestring) : since_open->valuedouble;
+        }
+
+        cJSON* since_change = cJSON_GetObjectItem(cum_funding, "sinceChange");
+        if (since_change) {
+            position->cum_funding_since_change = cJSON_IsString(since_change) ?
+                atof(since_change->valuestring) : since_change->valuedouble;
+        }
+    }
+
+    // Set coin symbol
+    strncpy(position->coin, coin->valuestring, sizeof(position->coin) - 1);
+
+    return HL_SUCCESS;
+}
+
+/**
  * @brief Fetch all positions
  */
 hl_error_t hl_fetch_positions(hl_client_t* client, hl_position_t** positions, size_t* count) {
     if (!client || !positions || !count) {
         return HL_ERROR_INVALID_PARAMS;
     }
-    
-    // TODO: Implement in Day 3
-    *positions = NULL;
-    *count = 0;
-    
-    return HL_ERROR_NOT_IMPLEMENTED;
+
+    const char* wallet = hl_client_get_wallet_address(client);
+    if (!wallet) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    http_client_t* http = (http_client_t*)hl_client_get_http(client);
+    if (!http) {
+        return HL_ERROR_INVALID_PARAMS;
+    }
+
+    // Build request - same as balance but we parse assetPositions
+    char body[512];
+    snprintf(body, sizeof(body),
+             "{\"type\":\"clearinghouseState\",\"user\":\"%s\"}",
+             wallet);
+
+    const char* base_url = get_base_url(client);
+    char url[256];
+    snprintf(url, sizeof(url), "%s/info", base_url);
+
+    // Make request
+    http_response_t response = {0};
+    lv3_error_t err = http_client_post(http, url, body, "Content-Type: application/json", &response);
+
+    if (err != LV3_SUCCESS) {
+        http_response_free(&response);
+        return HL_ERROR_NETWORK;
+    }
+
+    if (response.status_code != 200) {
+        http_response_free(&response);
+        return HL_ERROR_API;
+    }
+
+    // Parse response
+    cJSON* json = cJSON_Parse(response.body);
+    http_response_free(&response);
+
+    if (!json) {
+        return HL_ERROR_PARSE;
+    }
+
+    // Get assetPositions array
+    cJSON* asset_positions = cJSON_GetObjectItem(json, "assetPositions");
+    if (!asset_positions || !cJSON_IsArray(asset_positions)) {
+        cJSON_Delete(json);
+        *positions = NULL;
+        *count = 0;
+        return HL_SUCCESS; // No positions is not an error
+    }
+
+    int positions_count = cJSON_GetArraySize(asset_positions);
+    if (positions_count == 0) {
+        cJSON_Delete(json);
+        *positions = NULL;
+        *count = 0;
+        return HL_SUCCESS;
+    }
+
+    // Allocate positions array
+    hl_position_t* positions_array = calloc(positions_count, sizeof(hl_position_t));
+    if (!positions_array) {
+        cJSON_Delete(json);
+        return HL_ERROR_MEMORY;
+    }
+
+    // Parse each position
+    int valid_positions = 0;
+    for (int i = 0; i < positions_count; i++) {
+        cJSON* pos_data = cJSON_GetArrayItem(asset_positions, i);
+        if (!pos_data) continue;
+
+        hl_error_t parse_err = parse_position(pos_data, &positions_array[valid_positions]);
+        if (parse_err == HL_SUCCESS) {
+            valid_positions++;
+        }
+        // Skip invalid positions but continue parsing others
+    }
+
+    cJSON_Delete(json);
+
+    *positions = positions_array;
+    *count = valid_positions;
+
+    return HL_SUCCESS;
 }
 
 /**
@@ -292,9 +499,44 @@ hl_error_t hl_fetch_position(hl_client_t* client, const char* symbol, hl_positio
     if (!client || !symbol || !position) {
         return HL_ERROR_INVALID_PARAMS;
     }
-    
-    // TODO: Implement in Day 3
-    return HL_ERROR_NOT_IMPLEMENTED;
+
+    // Extract coin from symbol (e.g., "ETH/USDC:USDC" -> "ETH")
+    const char* coin = symbol;
+    const char* slash = strchr(symbol, '/');
+    if (slash) {
+        // Copy coin to temporary buffer
+        char coin_buf[32];
+        size_t coin_len = slash - symbol;
+        if (coin_len >= sizeof(coin_buf)) {
+            return HL_ERROR_INVALID_PARAMS;
+        }
+        memcpy(coin_buf, symbol, coin_len);
+        coin_buf[coin_len] = '\0';
+        coin = coin_buf;
+    }
+
+    // Fetch all positions and find the one we need
+    hl_position_t* all_positions = NULL;
+    size_t count = 0;
+
+    hl_error_t err = hl_fetch_positions(client, &all_positions, &count);
+    if (err != HL_SUCCESS) {
+        return err;
+    }
+
+    // Find position by coin
+    for (size_t i = 0; i < count; i++) {
+        if (strcmp(all_positions[i].coin, coin) == 0) {
+            // Found the position, copy it
+            memcpy(position, &all_positions[i], sizeof(hl_position_t));
+            hl_free_positions(all_positions, count);
+            return HL_SUCCESS;
+        }
+    }
+
+    // Position not found
+    hl_free_positions(all_positions, count);
+    return HL_ERROR_NOT_FOUND;
 }
 
 /**
@@ -314,8 +556,13 @@ hl_error_t hl_fetch_trading_fee(hl_client_t* client, const char* symbol, hl_trad
     if (!client || !symbol || !fee) {
         return HL_ERROR_INVALID_PARAMS;
     }
-    
-    // TODO: Implement later
-    return HL_ERROR_NOT_IMPLEMENTED;
+
+    // For now, return default fees
+    // TODO: Implement real fee fetching when API supports it
+    strncpy(fee->symbol, symbol, sizeof(fee->symbol) - 1);
+    fee->maker_fee = -0.0002; // -0.02%
+    fee->taker_fee = 0.0006;  // 0.06%
+
+    return HL_SUCCESS;
 }
 
