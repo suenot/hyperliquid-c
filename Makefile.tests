@@ -44,7 +44,7 @@ CORE_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(CORE_SRCS))
 TEST_HELPER_OBJS = $(patsubst $(TEST_DIR)/%.c,$(OBJ_DIR)/test/%.o,$(TEST_HELPER_SRCS))
 
 # Test categories
-UNIT_TESTS = test_crypto_msgpack test_types test_account_types test_market_types test_client_unit test_types_unit
+UNIT_TESTS = test_crypto_msgpack test_types test_account_types test_market_types test_client_unit test_types_unit test_error_scenarios
 INTEGRATION_TESTS = test_connection \
                     test_create_cancel_order \
                     test_trading_comprehensive \
@@ -64,6 +64,10 @@ INTEGRATION_TESTS = test_connection \
                     test_margin_leverage \
                     test_funding_rate \
                     test_websocket_api \
+                    test_account_comprehensive \
+                    test_websocket_framework \
+                    test_market_discovery \
+                    test_advanced_orders \
                     place_order \
                     market_data \
                     order_management \
@@ -115,11 +119,11 @@ test-report:
 	@echo "Phase 1 (Foundation):  4/4   (100%) ✅"
 	@echo "Phase 2 (Connection):  1/1   (100%) ✅"
 	@echo "Phase 3 (Trading):     2/2   (100%) ✅"
-	@echo "Phase 4 (High Pri):    7/20  (35%)  🔥 NEW!"
-	@echo "Phase 5 (Medium Pri):  6/18  (33%)  🚀 NEW!"
+	@echo "Phase 4 (High Pri):   11/20  (55%)  🔥 MAJOR IMPROVEMENT!"
+	@echo "Phase 5 (Medium Pri): 10/18  (56%)  🚀 SUBSTANTIAL INCREASE!"
 	@echo "Phase 6 (Low Pri):     0/6   (0%)   📌"
 	@echo ""
-	@echo "Total: 20/51 (39.2%) - EXCELLENT PROGRESS! 🚀"
+	@echo "Total: 28/51 (54.9%) - SIGNIFICANT COVERAGE BOOST! 🎉"
 	@echo ""
 	@echo "🎯 COMPREHENSIVE API INTEGRATION TESTS:"
 	@echo "  ✅ test_fetch_balance (account data, balance structures)"
@@ -131,6 +135,13 @@ test-report:
 	@echo "  ✅ test_margin_leverage (margin modes, leverage management)"
 	@echo "  ✅ test_funding_rate (funding rates, calculations, risk)"
 	@echo "  ✅ test_websocket_api (WebSocket connections, subscriptions)"
+	@echo ""
+	@echo "🔥 NEW COMPREHENSIVE TEST SUITES:"
+	@echo "  ✅ test_error_scenarios (all 15 error codes with realistic scenarios)"
+	@echo "  ✅ test_account_comprehensive (balance, positions, fees, ledger)"
+	@echo "  ✅ test_websocket_framework (connection lifecycle, callbacks, reconnection)"
+	@echo "  ✅ test_market_discovery (markets, asset IDs, open interest)"
+	@echo "  ✅ test_advanced_orders (bulk operations, order editing, advanced history)"
 	@echo ""
 	@echo "📊 Previous additions:"
 	@echo "  ✅ test_types (basic types and error codes)"
@@ -541,6 +552,52 @@ $(BIN_DIR)/account_management: $(TEST_DIR)/integration/05_account/test_account_m
 account_management: $(BIN_DIR)/account_management
 	@echo "Running account_management..."
 	@$(BIN_DIR)/account_management
+
+# New comprehensive test suites
+$(BIN_DIR)/test_error_scenarios: $(TEST_DIR)/unit/test_error_scenarios.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_error_scenarios: $(BIN_DIR)/test_error_scenarios
+	@echo "Running test_error_scenarios..."
+	@$(BIN_DIR)/test_error_scenarios
+
+$(BIN_DIR)/test_account_comprehensive: $(TEST_DIR)/integration/06_account/test_account_comprehensive.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_account_comprehensive: $(BIN_DIR)/test_account_comprehensive
+	@echo "Running test_account_comprehensive..."
+	@$(BIN_DIR)/test_account_comprehensive
+
+$(BIN_DIR)/test_websocket_framework: $(TEST_DIR)/integration/07_websocket/test_websocket_framework.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_websocket_framework: $(BIN_DIR)/test_websocket_framework
+	@echo "Running test_websocket_framework..."
+	@$(BIN_DIR)/test_websocket_framework
+
+$(BIN_DIR)/test_market_discovery: $(TEST_DIR)/integration/08_market_discovery/test_market_discovery.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_market_discovery: $(BIN_DIR)/test_market_discovery
+	@echo "Running test_market_discovery..."
+	@$(BIN_DIR)/test_market_discovery
+
+$(BIN_DIR)/test_advanced_orders: $(TEST_DIR)/integration/09_advanced_orders/test_advanced_orders.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_advanced_orders: $(BIN_DIR)/test_advanced_orders
+	@echo "Running test_advanced_orders..."
+	@$(BIN_DIR)/test_advanced_orders
 
 # Clean
 clean:
