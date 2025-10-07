@@ -16,6 +16,7 @@ extern int run_place_order_tests(void);
 extern int run_market_data_tests(void);
 extern int run_order_management_tests(void);
 extern int run_account_management_tests(void);
+extern int run_missing_api_tests(void);
 
 // Simple test suite structure
 typedef struct {
@@ -90,6 +91,7 @@ int main(int argc, char* argv[]) {
         // Unit Tests
         {"Client Unit Tests", run_client_tests, true},
         {"Types Unit Tests", run_types_tests, true},
+        {"Missing API Functions Tests", run_missing_api_tests, true},
 
         // Integration Tests
         {"Connection Tests", run_connection_tests, true},
