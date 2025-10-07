@@ -44,7 +44,7 @@ CORE_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(CORE_SRCS))
 TEST_HELPER_OBJS = $(patsubst $(TEST_DIR)/%.c,$(OBJ_DIR)/test/%.o,$(TEST_HELPER_SRCS))
 
 # Test categories
-UNIT_TESTS = test_crypto_msgpack test_types test_account_types test_market_types test_client_unit test_types_unit test_error_scenarios
+UNIT_TESTS = test_crypto_msgpack test_types test_account_types test_market_types test_client_unit test_types_unit test_error_scenarios test_missing_api
 INTEGRATION_TESTS = test_connection \
                     test_create_cancel_order \
                     test_trading_comprehensive \
@@ -562,6 +562,15 @@ $(BIN_DIR)/test_error_scenarios: $(TEST_DIR)/unit/test_error_scenarios.c $(TEST_
 test_error_scenarios: $(BIN_DIR)/test_error_scenarios
 	@echo "Running test_error_scenarios..."
 	@$(BIN_DIR)/test_error_scenarios
+
+$(BIN_DIR)/test_missing_api: $(TEST_DIR)/unit/test_missing_api_functions.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
+	@mkdir -p $(BIN_DIR)
+	@echo "Building $@"
+	@$(CC) $(CFLAGS) $< $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c -o $@ $(LDFLAGS) $(LIBS)
+
+test_missing_api: $(BIN_DIR)/test_missing_api
+	@echo "Running test_missing_api..."
+	@$(BIN_DIR)/test_missing_api
 
 $(BIN_DIR)/test_account_comprehensive: $(TEST_DIR)/integration/06_account/test_account_comprehensive.c $(TEST_HELPER_OBJS) $(SRC_DIR)/simple_types.c
 	@mkdir -p $(BIN_DIR)

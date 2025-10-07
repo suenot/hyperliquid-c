@@ -45,3 +45,8 @@ int run_account_management_tests(void) {
     extern int main_account_management_integration(void);
     return main_account_management_integration();
 }
+
+int run_missing_api_tests(void) {
+    extern int main_missing_api_unit(void);
+    return main_missing_api_unit();
+}
